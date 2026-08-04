@@ -110,6 +110,8 @@ export interface PlaybackRequest {
   studioTitle: string | null;
   videos: VideoInfo[];
   startAt: number;
+  qualityIndex: number;
+  autoplayNext: boolean;
 }
 
 const [playback, setPlayback] = createSignal<PlaybackRequest | null>(null);

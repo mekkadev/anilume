@@ -11,6 +11,7 @@ import {
 
 import { api } from "../lib/api";
 import { formatTime, qualityLabel } from "../lib/format";
+import { pickQualityIndex, qualityPref } from "../lib/prefs";
 import { closePlayer, pushToast, reportError } from "../lib/store";
 import type { PlaybackRequest } from "../lib/store";
 import type { VideoInfo, WatchProgress } from "../lib/types";
@@ -36,7 +37,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
   const [episodeIndex, setEpisodeIndex] = createSignal(props.request.episodeIndex);
   const [videos, setVideos] = createSignal<VideoInfo[]>(props.request.videos);
-  const [qualityIndex, setQualityIndex] = createSignal(0);
+  const [qualityIndex, setQualityIndex] = createSignal(props.request.qualityIndex);
   const [studioTitle, setStudioTitle] = createSignal(props.request.studioTitle);
 
   const [playing, setPlaying] = createSignal(false);
@@ -158,7 +159,8 @@ export function Player(props: { request: PlaybackRequest }) {
       const sameQuality = nextVideos.findIndex(
         (item) => item.quality === activeVideo()?.quality,
       );
-      const nextIndex = sameQuality >= 0 ? sameQuality : 0;
+      const nextIndex =
+        sameQuality >= 0 ? sameQuality : pickQualityIndex(nextVideos, qualityPref());
       setQualityIndex(nextIndex);
       await load(nextVideos[nextIndex]!, 0);
     } catch (error) {
@@ -345,7 +347,9 @@ export function Player(props: { request: PlaybackRequest }) {
         }}
         onEnded={() => {
           persist(true);
-          if (hasNext()) void switchEpisode(episodeIndex() + 1);
+          if (props.request.autoplayNext && hasNext()) {
+            void switchEpisode(episodeIndex() + 1);
+          }
         }}
         onVolumeChange={(event) => {
           setVolume(event.currentTarget.volume);
