@@ -80,6 +80,37 @@ def test_non_object_params_rejected(sidecar):
     )
     assert response["error"]["code"] == -32600
 
+def test_entrypoint_runs_as_a_plain_script():
+    result = subprocess.run(
+        [sys.executable, "entrypoint.py", "--version"],
+        cwd=SIDECAR_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip()
+
+def test_library_prints_do_not_corrupt_the_protocol():
+    code = (
+        "import sys\n"
+        "from anilume_sidecar.server import claim_stdout\n"
+        "channel = claim_stdout()\n"
+        "print('предупреждение от библиотеки')\n"
+        "sys.stdout.write('ещё одна строка мимо протокола\\n')\n"
+        "channel.write('{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":null}\\n')\n"
+        "channel.flush()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=SIDECAR_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.stdout == '{"jsonrpc":"2.0","id":1,"result":null}\n'
+    assert "предупреждение от библиотеки" in result.stderr
+
 def test_shutdown_on_stdin_close(sidecar):
     sidecar.call("ping")
     sidecar.proc.stdin.close()
