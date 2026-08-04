@@ -60,6 +60,28 @@ jobs:
           binary=$(ls src-tauri/binaries/anilume-sidecar-${{ matrix.target }}*)
           echo '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' | "$binary" | grep -q '"ok":true'
 
+      - name: Кеш сборок ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: .cache/ffmpeg
+          key: ffmpeg-${{ matrix.target }}-v1
+
+      - name: Положить ffmpeg в бандл
+        run: python scripts/fetch_ffmpeg.py --triple ${{ matrix.target }}
+
+      - name: Проверить, что ffmpeg реально ремуксит HLS
+        shell: bash
+        run: |
+          binary=$(ls src-tauri/binaries/ffmpeg-${{ matrix.target }}*)
+          "$binary" -version | head -1
+          "$binary" -v error -f lavfi -i testsrc=duration=2:size=320x240:rate=10 \
+            -f lavfi -i sine=duration=2 -c:v libx264 -c:a aac \
+            -f hls -hls_list_size 0 -hls_segment_filename 'seg%d.ts' probe.m3u8 -y
+          "$binary" -v error -i probe.m3u8 -c copy -bsf:a aac_adtstoasc \
+            -movflags +faststart probe.mp4 -y
+          test -s probe.mp4
+          rm -f probe.m3u8 seg*.ts probe.mp4
+
       - name: Установить зависимости интерфейса
         run: npm ci
 

@@ -33,3 +33,6 @@ Thumbs.db
 # Local config / secrets
 .env
 .env.local
+
+# Кеш скачанных сборок ffmpeg
+.cache/

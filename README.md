@@ -88,9 +88,9 @@ tokens refresh on their own and requests are paced to stay inside the rate limit
 
 ## downloads
 
-ffmpeg remuxes the stream to mp4 without re-encoding, so a 24-minute episode takes about as long as the bytes take to arrive. progress comes from parsing ffmpeg's own output, two at a time, cancellable.
+ffmpeg is bundled, so downloads work out of the box. it remuxes the stream to mp4 without re-encoding, so a 24-minute episode takes about as long as the bytes take to arrive. progress comes from parsing ffmpeg's own output, two at a time, cancellable. `ANILUME_FFMPEG` overrides the bundled binary if you want your own.
 
-ffmpeg is **not** bundled — that is a 70 mb binary and a licensing question for a feature not everyone wants. install it, or point `ANILUME_FFMPEG` at one. without it the app runs fine and the download buttons explain themselves.
+that convenience is most of the download size: the app itself is around 20 mb and ffmpeg is 50-110 mb on top, depending on platform. the builds are pinned by sha256 and ci refuses to package one until it has actually remuxed a test stream on that runner — a static build that segfaults on mpeg-ts is a real thing, and it happened while wiring this up.
 
 files land in `~/Videos/anilume/<title>/<title> - 03 серия [dub] [1080p].mp4`.
 
@@ -99,6 +99,7 @@ files land in `~/Videos/anilume/<title>/<title> - 03 серия [dub] [1080p].mp
 - **parsers break.** sites change their markup and anicli-api catches up on its own schedule. when a source fails, the app names it and suggests another rather than pretending nothing happened.
 - **animego, kodik and aniboom want a cis ip.** anilibria and yummy anime do not, which is why anilibria is the default.
 - **handles do not survive a restart.** the app re-resolves by title search, which is fast but can land on the wrong entry if a catalogue has near-duplicates.
+- **the download is large.** bundling ffmpeg is the whole reason: ~70 mb on macos, ~135 mb on windows. see [third-party licenses](./THIRD-PARTY.md) — the macos build is gpl, the windows one lgpl.
 - **the sidecar is python.** pyinstaller adds about 17 mb to the bundle. porting nine extractors to rust to avoid it was not worth doing twice.
 - **neither build is signed.** see install.
 - **not a library.** it plays what public sources already serve; it hosts and decrypts nothing.
