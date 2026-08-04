@@ -68,7 +68,7 @@ export function Downloads() {
           <h1 class="page-title">Загрузки</h1>
           <p class="page-sub">Серии, сохранённые для просмотра без сети</p>
         </div>
-        <button class="btn btn--ghost" onClick={() => void refetch()}>
+        <button class="btn" onClick={() => void refetch()}>
           <Icon name="refresh" size={16} />
           Обновить
         </button>
@@ -140,7 +140,7 @@ export function Downloads() {
                     when={item.status === "running" || item.status === "queued"}
                     fallback={
                       <button
-                        class="icon-btn btn--danger"
+                        class="tool-btn btn--danger"
                         title="Удалить"
                         disabled={busy() === item.id}
                         onClick={() => void remove(item, item.status === "done")}
@@ -150,7 +150,7 @@ export function Downloads() {
                     }
                   >
                     <button
-                      class="icon-btn"
+                      class="tool-btn"
                       title="Отменить"
                       disabled={busy() === item.id}
                       onClick={() => void cancel(item)}

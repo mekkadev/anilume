@@ -316,7 +316,7 @@ export function Title(props: { card: AnimeCard }) {
                     <Show when={nextEpisode()}>
                       {(episode) => (
                         <button
-                          class="btn btn--primary"
+                          class="btn btn--primary btn--lg"
                           onClick={() => void startEpisode(episode())}
                           disabled={busyEpisode() !== null}
                         >
@@ -434,7 +434,7 @@ function LibraryMenu(props: {
 
   return (
     <div class="menu">
-      <button class="btn btn--ghost" onClick={() => setOpen(!open())}>
+      <button class="btn" onClick={() => setOpen(!open())}>
         <Icon name="bookmark" size={16} />
         {props.current ? LIBRARY_LABELS[props.current] : "В библиотеку"}
       </button>

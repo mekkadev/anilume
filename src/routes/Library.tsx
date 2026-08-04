@@ -96,7 +96,7 @@ export function Library() {
                 </button>
 
                 <button
-                  class="icon-btn btn--danger"
+                  class="tool-btn btn--danger"
                   title="Убрать"
                   onClick={() => void remove(entry)}
                 >

@@ -27,7 +27,7 @@ export function StudioSheet(props: StudioSheetProps) {
             <div class="sheet__title">Озвучка</div>
             <div class="sheet__sub">{props.episode.title}</div>
           </div>
-          <button class="icon-btn" onClick={props.onClose}>
+          <button class="tool-btn" onClick={props.onClose}>
             <Icon name="close" size={18} />
           </button>
         </div>
