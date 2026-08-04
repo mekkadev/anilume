@@ -78,12 +78,25 @@ jobs:
         run: |
           binary=$(ls src-tauri/binaries/ffmpeg-${{ matrix.target }}*)
           "$binary" -version | head -1
+
+          encoders=$("$binary" -hide_banner -encoders 2>/dev/null)
+          if grep -q " libx264 " <<< "$encoders"; then
+            encoder=libx264
+          elif grep -q " libopenh264 " <<< "$encoders"; then
+            encoder=libopenh264
+          else
+            echo "В сборке нет ни libx264, ни libopenh264 — проверить ремукс нечем"
+            exit 1
+          fi
+          echo "Проверяем через $encoder"
+
           "$binary" -v error -f lavfi -i testsrc=duration=2:size=320x240:rate=10 \
-            -f lavfi -i sine=duration=2 -c:v libx264 -c:a aac \
+            -f lavfi -i sine=duration=2 -c:v "$encoder" -c:a aac \
             -f hls -hls_list_size 0 -hls_segment_filename 'seg%d.ts' probe.m3u8 -y
           "$binary" -v error -i probe.m3u8 -c copy -bsf:a aac_adtstoasc \
             -movflags +faststart probe.mp4 -y
           test -s probe.mp4
+          "$binary" -v error -i probe.mp4 -f null -
           rm -f probe.m3u8 seg*.ts probe.mp4
 
       - name: Установить зависимости интерфейса
