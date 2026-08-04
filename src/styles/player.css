@@ -4,7 +4,7 @@
   z-index: 800;
   background: #000;
   animation: player-in var(--normal) var(--ease-out);
-  cursor: default;
+  color: #fff;
 }
 
 .player[data-controls="false"] {
@@ -14,7 +14,7 @@
 @keyframes player-in {
   from {
     opacity: 0;
-    transform: scale(1.02);
+    transform: scale(1.015);
   }
 }
 
@@ -33,41 +33,30 @@
   pointer-events: none;
 }
 
-.player__top,
-.player__bottom {
+.player__top {
   position: absolute;
+  top: 0;
   left: 0;
   right: 0;
-  padding: 18px 24px;
-  transition: opacity var(--normal) var(--ease-out), transform var(--normal) var(--ease-out);
-}
-
-.player__top {
-  top: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent);
-  padding-top: 22px;
-  padding-bottom: 44px;
+  gap: 12px;
+  padding: 14px 18px 40px;
+  padding-left: var(--traffic-lights);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+  transition: opacity var(--normal) var(--ease-out), transform var(--normal) var(--ease-out);
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
-.player__bottom {
-  bottom: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.86), transparent);
-  padding-bottom: 20px;
-  padding-top: 52px;
+.player__top > * {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .player[data-controls="false"] .player__top {
   opacity: 0;
-  transform: translateY(-12px);
-  pointer-events: none;
-}
-
-.player[data-controls="false"] .player__bottom {
-  opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(-10px);
   pointer-events: none;
 }
 
@@ -76,23 +65,44 @@
 }
 
 .player__title {
-  font-size: 16px;
-  font-weight: 680;
+  font-size: 14px;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .player__subtitle {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.player__bar {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  width: min(760px, calc(100% - 48px));
+  transform: translateX(-50%);
+  padding: 10px 14px 8px;
+  border-radius: var(--r-xl);
+  background: rgba(38, 38, 40, 0.62);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 16px 44px rgba(0, 0, 0, 0.5);
+  transition: opacity var(--normal) var(--ease-out), transform var(--normal) var(--ease-out);
+}
+
+.player[data-controls="false"] .player__bar {
+  opacity: 0;
+  transform: translate(-50%, 14px);
+  pointer-events: none;
+}
+
 .scrub {
-  padding: 9px 0;
+  padding: 6px 0 8px;
   cursor: pointer;
 }
 
@@ -100,12 +110,12 @@
   position: relative;
   height: 4px;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
   transition: height var(--fast) var(--ease-out);
 }
 
 .scrub:hover .scrub__track {
-  height: 7px;
+  height: 6px;
 }
 
 .scrub__buffer {
@@ -119,21 +129,20 @@
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--r-full);
-  background: var(--accent-bright);
-  box-shadow: 0 0 12px var(--accent-glow);
+  background: #fff;
 }
 
 .scrub__knob {
   position: absolute;
   right: 0;
   top: 50%;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #fff;
   transform: translate(50%, -50%) scale(0);
   transition: transform var(--fast) var(--ease-spring);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
 .scrub:hover .scrub__knob {
@@ -143,33 +152,46 @@
 .player__controls {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 3px;
 }
 
-.player__controls .icon-btn {
-  color: rgba(255, 255, 255, 0.85);
+.player-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: rgba(255, 255, 255, 0.9);
+  transition: background var(--fast) var(--ease-out), color var(--fast) var(--ease-out);
 }
 
-.player__controls .icon-btn:hover:not(:disabled) {
-  color: #fff;
+.player-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
+  color: #fff;
 }
 
-.icon-btn--lg {
-  width: 46px;
-  height: 46px;
+.player-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.player-btn:disabled {
+  opacity: 0.3;
+}
+
+.player-btn--lg {
+  width: 38px;
+  height: 38px;
 }
 
 .player__time {
-  margin-left: 8px;
-  font-size: 13px;
+  margin: 0 8px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .player__time span {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .player__spacer {
@@ -179,7 +201,6 @@
 .volume {
   display: flex;
   align-items: center;
-  gap: 2px;
 }
 
 .volume__slider {
@@ -188,39 +209,50 @@
   height: 4px;
   appearance: none;
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.25);
   transition: width var(--normal) var(--ease-out), opacity var(--fast) var(--ease-out);
   cursor: pointer;
 }
 
 .volume:hover .volume__slider,
 .volume__slider:focus-visible {
-  width: 84px;
+  width: 72px;
   opacity: 1;
-  margin-right: 8px;
+  margin: 0 8px 0 4px;
 }
 
 .volume__slider::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .pill {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--r-full);
-  font-size: 12.5px;
-  font-weight: 650;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.12);
-  transition: background var(--fast) var(--ease-out), color var(--fast) var(--ease-out);
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+  transition: background var(--fast) var(--ease-out);
 }
 
 .pill:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.24);
   color: #fff;
+}
+
+.player .menu__list {
+  background: rgba(48, 48, 50, 0.82);
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+.player .menu__item {
+  color: rgba(255, 255, 255, 0.92);
 }

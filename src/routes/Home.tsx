@@ -45,14 +45,30 @@ export function Home() {
 
   return (
     <div class="fade-in">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Главная</h1>
+          <p class="page-sub">
+            {sourceName(activeSource())}
+            <Show when={geoNote()}> · нужен IP СНГ</Show>
+          </p>
+        </div>
+        <button
+          class="btn"
+          onClick={() => {
+            void refetch();
+            void refetchContinue();
+          }}
+        >
+          <Icon name="refresh" size={14} />
+          Обновить
+        </button>
+      </div>
+
       <Show when={(continueList() ?? []).length > 0}>
         <section class="section">
           <div class="section__head">
             <h2 class="section__title">Продолжить смотреть</h2>
-            <button class="btn btn--ghost" onClick={() => void refetchContinue()}>
-              <Icon name="refresh" size={16} />
-              Обновить
-            </button>
           </div>
 
           <div class="resume-rail">
@@ -70,18 +86,8 @@ export function Home() {
       </Show>
 
       <section class="section">
-        <div class="page-head">
-          <div>
-            <h1 class="page-title">Онгоинги</h1>
-            <p class="page-sub">
-              Свежие серии — {sourceName(activeSource())}
-              <Show when={geoNote()}> · нужен IP СНГ</Show>
-            </p>
-          </div>
-          <button class="btn btn--ghost" onClick={() => void refetch()}>
-            <Icon name="refresh" size={16} />
-            Обновить
-          </button>
+        <div class="section__head">
+          <h2 class="section__title">Онгоинги</h2>
         </div>
 
         <Show

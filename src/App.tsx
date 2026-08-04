@@ -23,10 +23,19 @@ import {
 
 export function App() {
   const [query, setQuery] = createSignal("");
+  const [scrolled, setScrolled] = createSignal(false);
   let searchInput: HTMLInputElement | undefined;
 
   onMount(() => {
     loadSources().catch(reportError);
+
+    void import("@tauri-apps/plugin-os")
+      .then(({ platform }) => {
+        document.documentElement.dataset.platform = platform();
+      })
+      .catch(() => {
+        document.documentElement.dataset.platform = "unknown";
+      });
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (playback()) return;
@@ -74,22 +83,24 @@ export function App() {
         <Sidebar />
 
         <div class="main">
-          <header class="titlebar">
+          <header class="toolbar" data-scrolled={scrolled()}>
             <button
-              class="icon-btn"
+              class="tool-btn"
               onClick={goBack}
               disabled={!canGoBack()}
               title="Назад"
             >
-              <Icon name="back" />
+              <Icon name="back" size={17} />
             </button>
 
-            <form class="searchbar" onSubmit={submitSearch}>
-              <Icon name="search" size={17} />
+            <div class="toolbar__spacer" />
+
+            <form class="search-field" onSubmit={submitSearch}>
+              <Icon name="search" size={14} />
               <input
                 ref={searchInput}
                 type="search"
-                placeholder="Поиск аниме"
+                placeholder="Поиск"
                 value={query()}
                 onInput={(event) => setQuery(event.currentTarget.value)}
                 spellcheck={false}
@@ -99,7 +110,10 @@ export function App() {
             </form>
           </header>
 
-          <main class="content">
+          <main
+            class="content"
+            onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
+          >
             <Switch>
               <Match when={matchRoute(route(), "home")}>
                 <Home />

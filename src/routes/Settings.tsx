@@ -185,7 +185,7 @@ export function Settings() {
                   <Show
                     when={redirect() === LOOPBACK}
                     fallback={
-                      <button class="btn btn--ghost" onClick={() => void openAuthPage()}>
+                      <button class="btn" onClick={() => void openAuthPage()}>
                         <Icon name="external" size={16} />
                         Открыть страницу входа
                       </button>
@@ -231,7 +231,7 @@ export function Settings() {
                 Прогресс и статусы отправляются в Shikimori автоматически
               </div>
             </div>
-            <button class="btn btn--ghost btn--danger" onClick={() => void logout()}>
+            <button class="btn btn--danger" onClick={() => void logout()}>
               Выйти
             </button>
           </div>

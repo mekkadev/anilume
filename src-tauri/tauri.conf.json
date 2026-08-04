@@ -25,9 +25,14 @@
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "transparent": false,
+        "transparent": true,
         "dragDropEnabled": false,
-        "backgroundColor": "#0a0b10"
+        "trafficLightPosition": { "x": 19, "y": 23 },
+        "windowEffects": {
+          "effects": ["sidebar", "mica"],
+          "state": "followsWindowActiveState",
+          "radius": 12
+        }
       }
     ],
     "security": {

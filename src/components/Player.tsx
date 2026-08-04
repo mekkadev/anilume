@@ -360,7 +360,7 @@ export function Player(props: { request: PlaybackRequest }) {
       </Show>
 
       <div class="player__top">
-        <button class="icon-btn" onClick={exit} title="Закрыть (Esc)">
+        <button class="player-btn" onClick={exit} title="Закрыть (Esc)">
           <Icon name="close" size={20} />
         </button>
         <div class="player__heading">
@@ -372,7 +372,7 @@ export function Player(props: { request: PlaybackRequest }) {
         </div>
       </div>
 
-      <div class="player__bottom">
+      <div class="player__bar">
         <div class="scrub" onClick={onScrub}>
           <div class="scrub__track">
             <div class="scrub__buffer" style={{ width: `${bufferPercent()}%` }} />
@@ -384,7 +384,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
         <div class="player__controls">
           <button
-            class="icon-btn"
+            class="player-btn"
             onClick={() => void switchEpisode(episodeIndex() - 1)}
             disabled={!hasPrevious() || switchingTo() !== null}
             title="Предыдущая серия"
@@ -392,12 +392,12 @@ export function Player(props: { request: PlaybackRequest }) {
             <Icon name="previous" size={19} />
           </button>
 
-          <button class="icon-btn icon-btn--lg" onClick={togglePlay} title="Пробел">
+          <button class="player-btn player-btn--lg" onClick={togglePlay} title="Пробел">
             <Icon name={playing() ? "pause" : "play"} size={24} />
           </button>
 
           <button
-            class="icon-btn"
+            class="player-btn"
             onClick={() => void switchEpisode(episodeIndex() + 1)}
             disabled={!hasNext() || switchingTo() !== null}
             title="Следующая серия (N)"
@@ -411,7 +411,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
           <div class="volume">
             <button
-              class="icon-btn"
+              class="player-btn"
               onClick={() => {
                 video.muted = !video.muted;
                 setMuted(video.muted);
@@ -490,12 +490,12 @@ export function Player(props: { request: PlaybackRequest }) {
             </Show>
           </div>
 
-          <button class="icon-btn" onClick={() => void togglePip()} title="Картинка в картинке (P)">
+          <button class="player-btn" onClick={() => void togglePip()} title="Картинка в картинке (P)">
             <Icon name="pip" size={19} />
           </button>
 
           <button
-            class="icon-btn"
+            class="player-btn"
             onClick={() => void toggleFullscreen()}
             title="Во весь экран (F)"
           >
