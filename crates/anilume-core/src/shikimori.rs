@@ -117,8 +117,7 @@ impl Shikimori {
     }
 
     pub fn save_config(&self, config: &ShikimoriConfig) -> Result<()> {
-        let encoded =
-            serde_json::to_string(config).map_err(|e| CoreError::Other(e.to_string()))?;
+        let encoded = serde_json::to_string(config).map_err(|e| CoreError::Other(e.to_string()))?;
         self.db.setting_set(SETTING_CONFIG, &encoded)
     }
 
@@ -200,7 +199,9 @@ impl Shikimori {
     }
 
     pub async fn whoami(&self) -> Result<Account> {
-        let response = self.authorized(reqwest::Method::GET, "/api/users/whoami", None).await?;
+        let response = self
+            .authorized(reqwest::Method::GET, "/api/users/whoami", None)
+            .await?;
         serde_json::from_value(response)
             .map_err(|e| CoreError::Other(format!("Shikimori вернул неожиданный профиль: {e}")))
     }
@@ -350,8 +351,7 @@ impl Shikimori {
     }
 
     fn store_tokens(&self, tokens: &Tokens) -> Result<()> {
-        let encoded =
-            serde_json::to_string(tokens).map_err(|e| CoreError::Other(e.to_string()))?;
+        let encoded = serde_json::to_string(tokens).map_err(|e| CoreError::Other(e.to_string()))?;
         self.db.setting_set(SETTING_TOKENS, &encoded)
     }
 
@@ -398,9 +398,13 @@ async fn wait_for_code(listener: tokio::net::TcpListener) -> Result<String> {
         let mut stream = reader.into_inner();
 
         if let Some(error) = params.get("error") {
-            let _ = stream.write_all(html_response("Вход отменён").as_bytes()).await;
+            let _ = stream
+                .write_all(html_response("Вход отменён").as_bytes())
+                .await;
             let _ = stream.flush().await;
-            return Err(CoreError::Other(format!("Shikimori отказал во входе: {error}")));
+            return Err(CoreError::Other(format!(
+                "Shikimori отказал во входе: {error}"
+            )));
         }
 
         if let Some(code) = params.get("code") {
@@ -474,7 +478,9 @@ mod tests {
     #[test]
     fn authorize_url_carries_every_required_parameter() {
         let client = shikimori();
-        client.save_config(&config("http://127.0.0.1:53682/")).unwrap();
+        client
+            .save_config(&config("http://127.0.0.1:53682/"))
+            .unwrap();
 
         let url = url::Url::parse(&client.authorize_url().unwrap()).unwrap();
         let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
@@ -496,7 +502,10 @@ mod tests {
 
     #[test]
     fn loopback_port_is_read_from_redirect_uri() {
-        assert_eq!(config("http://127.0.0.1:53682/").loopback_port().unwrap(), 53682);
+        assert_eq!(
+            config("http://127.0.0.1:53682/").loopback_port().unwrap(),
+            53682
+        );
         assert!(config(OOB_REDIRECT).loopback_port().is_err());
         assert!(config("http://127.0.0.1/").loopback_port().is_err());
     }
@@ -552,11 +561,15 @@ mod tests {
 
     #[tokio::test]
     async fn loopback_listener_extracts_code_from_callback() {
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
         let port = listener.local_addr().unwrap().port();
 
         let waiter = tokio::spawn(wait_for_code(listener));
-        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
         client
             .write_all(b"GET /?code=abc123&state=x HTTP/1.1\r\nHost: localhost\r\n\r\n")
             .await
@@ -567,11 +580,15 @@ mod tests {
 
     #[tokio::test]
     async fn loopback_listener_reports_denied_access() {
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
         let port = listener.local_addr().unwrap().port();
 
         let waiter = tokio::spawn(wait_for_code(listener));
-        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
         client
             .write_all(b"GET /?error=access_denied HTTP/1.1\r\nHost: localhost\r\n\r\n")
             .await
