@@ -1,0 +1,226 @@
+.player {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: #000;
+  animation: player-in var(--normal) var(--ease-out);
+  cursor: default;
+}
+
+.player[data-controls="false"] {
+  cursor: none;
+}
+
+@keyframes player-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+.player__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.player__spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.player__top,
+.player__bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 18px 24px;
+  transition: opacity var(--normal) var(--ease-out), transform var(--normal) var(--ease-out);
+}
+
+.player__top {
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent);
+  padding-top: 22px;
+  padding-bottom: 44px;
+}
+
+.player__bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.86), transparent);
+  padding-bottom: 20px;
+  padding-top: 52px;
+}
+
+.player[data-controls="false"] .player__top {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+}
+
+.player[data-controls="false"] .player__bottom {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+.player__heading {
+  min-width: 0;
+}
+
+.player__title {
+  font-size: 16px;
+  font-weight: 680;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player__subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.62);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrub {
+  padding: 9px 0;
+  cursor: pointer;
+}
+
+.scrub__track {
+  position: relative;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.22);
+  transition: height var(--fast) var(--ease-out);
+}
+
+.scrub:hover .scrub__track {
+  height: 7px;
+}
+
+.scrub__buffer {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.scrub__played {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-full);
+  background: var(--accent-bright);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.scrub__knob {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(50%, -50%) scale(0);
+  transition: transform var(--fast) var(--ease-spring);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.scrub:hover .scrub__knob {
+  transform: translate(50%, -50%) scale(1);
+}
+
+.player__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.player__controls .icon-btn {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.player__controls .icon-btn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.icon-btn--lg {
+  width: 46px;
+  height: 46px;
+}
+
+.player__time {
+  margin-left: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.player__time span {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.player__spacer {
+  flex: 1;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.volume__slider {
+  width: 0;
+  opacity: 0;
+  height: 4px;
+  appearance: none;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.28);
+  transition: width var(--normal) var(--ease-out), opacity var(--fast) var(--ease-out);
+  cursor: pointer;
+}
+
+.volume:hover .volume__slider,
+.volume__slider:focus-visible {
+  width: 84px;
+  opacity: 1;
+  margin-right: 8px;
+}
+
+.volume__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.pill {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-full);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  transition: background var(--fast) var(--ease-out), color var(--fast) var(--ease-out);
+}
+
+.pill:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}

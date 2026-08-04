@@ -16,6 +16,35 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(60);
 
 type Pending = Arc<DashMap<u64, oneshot::Sender<Result<Value>>>>;
 
+#[derive(Debug, Clone)]
+pub struct SidecarSpec {
+    pub program: std::path::PathBuf,
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+}
+
+impl SidecarSpec {
+    pub fn binary(program: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            program: program.into(),
+            args: Vec::new(),
+            env: Vec::new(),
+        }
+    }
+
+    pub fn python_module(interpreter: &str, package_root: &Path) -> Self {
+        Self {
+            program: interpreter.into(),
+            args: vec!["-m".into(), "anilume_sidecar".into()],
+            env: vec![
+                ("PYTHONPATH".into(), package_root.to_string_lossy().into_owned()),
+                ("PYTHONUNBUFFERED".into(), "1".into()),
+                ("PYTHONIOENCODING".into(), "utf-8".into()),
+            ],
+        }
+    }
+}
+
 pub struct SidecarClient {
     stdin: Mutex<ChildStdin>,
     pending: Pending,
@@ -24,10 +53,11 @@ pub struct SidecarClient {
 }
 
 impl SidecarClient {
-    pub async fn spawn(executable: &Path, args: &[String]) -> Result<Arc<Self>> {
-        let mut command = Command::new(executable);
+    pub async fn spawn(spec: &SidecarSpec) -> Result<Arc<Self>> {
+        let mut command = Command::new(&spec.program);
         command
-            .args(args)
+            .args(&spec.args)
+            .envs(spec.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -42,7 +72,7 @@ impl SidecarClient {
         let mut child = command.spawn().map_err(|e| {
             CoreError::Other(format!(
                 "Не удалось запустить сайдкар {}: {e}",
-                executable.display()
+                spec.program.display()
             ))
         })?;
 

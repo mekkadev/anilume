@@ -1,0 +1,88 @@
+mod commands;
+mod state;
+
+use tauri::{Emitter, Manager};
+
+use state::AppState;
+
+pub const DOWNLOAD_EVENT: &str = "anilume://download-progress";
+
+pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_env("ANILUME_LOG")
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_os::init())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            let data_dir = handle
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::env::temp_dir().join("anilume"));
+            let downloads_dir = handle
+                .path()
+                .video_dir()
+                .map(|dir| dir.join("anilume"))
+                .unwrap_or_else(|_| data_dir.join("downloads"));
+
+            let state = tauri::async_runtime::block_on(AppState::initialize(
+                data_dir,
+                downloads_dir,
+            ))?;
+
+            let mut events = state.downloads.subscribe();
+            let emitter = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                while let Ok(event) = events.recv().await {
+                    let _ = emitter.emit(DOWNLOAD_EVENT, event);
+                }
+            });
+
+            app.manage(state);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::sources_list,
+            commands::catalog_ongoing,
+            commands::catalog_search,
+            commands::catalog_search_multi,
+            commands::anime_get,
+            commands::episode_studios,
+            commands::studio_videos,
+            commands::playback_open,
+            commands::playback_close,
+            commands::progress_save,
+            commands::progress_for_anime,
+            commands::continue_watching,
+            commands::forget_anime,
+            commands::library_list,
+            commands::library_get,
+            commands::library_upsert,
+            commands::library_remove,
+            commands::setting_get,
+            commands::setting_set,
+            commands::shikimori_status,
+            commands::shikimori_configure,
+            commands::shikimori_authorize_url,
+            commands::shikimori_login_with_code,
+            commands::shikimori_login_loopback,
+            commands::shikimori_logout,
+            commands::shikimori_get_rate,
+            commands::shikimori_set_rate,
+            commands::downloads_available,
+            commands::downloads_list,
+            commands::downloads_enqueue,
+            commands::downloads_cancel,
+            commands::downloads_remove,
+            commands::downloads_find_completed,
+        ])
+        .run(tauri::generate_context!())
+        .expect("не удалось запустить anilume");
+}

@@ -10,4 +10,4 @@ pub use downloads::{DownloadEvent, DownloadItem, DownloadManager, DownloadReques
 pub use error::{CoreError, ErrorPayload, Result};
 pub use proxy::ProxyHandle;
 pub use shikimori::{Account, Shikimori, ShikimoriConfig, UserRate};
-pub use sidecar::SidecarClient;
+pub use sidecar::{SidecarClient, SidecarSpec};
