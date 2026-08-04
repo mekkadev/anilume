@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: "1"
+
 jobs:
   build:
     name: ${{ matrix.label }}
