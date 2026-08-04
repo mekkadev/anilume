@@ -27,9 +27,15 @@
         "hiddenTitle": true,
         "transparent": true,
         "dragDropEnabled": false,
-        "trafficLightPosition": { "x": 19, "y": 23 },
+        "trafficLightPosition": {
+          "x": 19,
+          "y": 23
+        },
         "windowEffects": {
-          "effects": ["sidebar", "mica"],
+          "effects": [
+            "sidebar",
+            "mica"
+          ],
           "state": "followsWindowActiveState",
           "radius": 12
         }
@@ -51,7 +57,12 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": false,
-    "targets": ["app", "dmg", "msi", "nsis"],
+    "targets": [
+      "app",
+      "dmg",
+      "msi",
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -59,7 +70,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/anilume-sidecar"],
+    "externalBin": [
+      "binaries/anilume-sidecar",
+      "binaries/ffmpeg"
+    ],
     "resources": [],
     "copyright": "MIT",
     "category": "Entertainment",
@@ -71,7 +85,10 @@
     "windows": {
       "nsis": {
         "installMode": "perMachine",
-        "languages": ["Russian", "English"]
+        "languages": [
+          "Russian",
+          "English"
+        ]
       }
     }
   }
