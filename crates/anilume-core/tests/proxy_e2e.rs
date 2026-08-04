@@ -33,7 +33,10 @@ async fn master(State(state): State<Arc<Upstream>>, headers: HeaderMap) -> impl 
                 parts/seg-1.ts\n\
                 #EXT-X-ENDLIST\n";
     (
-        [(axum::http::header::CONTENT_TYPE, "application/vnd.apple.mpegurl")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/vnd.apple.mpegurl",
+        )],
         body,
     )
         .into_response()
@@ -143,10 +146,9 @@ async fn upstream_rejection_surfaces_as_bad_gateway_free_status() {
     let proxy = ProxyHandle::start().await.unwrap();
     let session = proxy.open_session(Default::default());
 
-    let response = reqwest::get(proxy.proxied_url(
-        &session,
-        &format!("http://{upstream_addr}/hls/master.m3u8"),
-    ))
+    let response = reqwest::get(
+        proxy.proxied_url(&session, &format!("http://{upstream_addr}/hls/master.m3u8")),
+    )
     .await
     .unwrap();
 

@@ -171,7 +171,11 @@ impl DownloadManager {
     pub fn get(&self, id: i64) -> Result<Option<DownloadItem>> {
         let conn = self.db_conn();
         Ok(conn
-            .query_row("SELECT * FROM downloads WHERE id = ?1", params![id], row_to_item)
+            .query_row(
+                "SELECT * FROM downloads WHERE id = ?1",
+                params![id],
+                row_to_item,
+            )
             .optional()?)
     }
 
@@ -231,9 +235,10 @@ impl DownloadManager {
             .spawn()
             .map_err(|e| CoreError::Other(format!("Не удалось запустить ffmpeg: {e}")))?;
 
-        let stderr = child.stderr.take().ok_or_else(|| {
-            CoreError::Other("ffmpeg не отдал поток диагностики".into())
-        })?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| CoreError::Other("ffmpeg не отдал поток диагностики".into()))?;
 
         let events = self.events.clone();
         let db = self.db.clone();
@@ -274,7 +279,9 @@ impl DownloadManager {
         if status.success() {
             Ok(true)
         } else if detail.is_empty() {
-            Err(CoreError::Other(format!("ffmpeg завершился с ошибкой ({status})")))
+            Err(CoreError::Other(format!(
+                "ffmpeg завершился с ошибкой ({status})"
+            )))
         } else {
             Err(CoreError::Other(detail))
         }
@@ -573,7 +580,9 @@ mod tests {
         let mut tracker = ProgressTracker::default();
         tracker.feed("  Duration: 00:20:00.00, start: 0.000000, bitrate: 1200 kb/s");
 
-        let progress = tracker.feed("frame=1 fps=25 time=00:10:00.00 bitrate=1").unwrap();
+        let progress = tracker
+            .feed("frame=1 fps=25 time=00:10:00.00 bitrate=1")
+            .unwrap();
         assert!((progress - 0.5).abs() < 1e-9);
     }
 
@@ -603,8 +612,14 @@ mod tests {
 
     #[test]
     fn labeled_time_parsing_handles_ffmpeg_shapes() {
-        assert_eq!(parse_labeled_time("time=00:01:30.50 bitrate=x", "time="), Some(90.5));
-        assert_eq!(parse_labeled_time("  Duration: 00:23:40.00,", "Duration:"), Some(1420.0));
+        assert_eq!(
+            parse_labeled_time("time=00:01:30.50 bitrate=x", "time="),
+            Some(90.5)
+        );
+        assert_eq!(
+            parse_labeled_time("  Duration: 00:23:40.00,", "Duration:"),
+            Some(1420.0)
+        );
         assert_eq!(parse_labeled_time("Duration: N/A", "Duration:"), None);
         assert_eq!(parse_labeled_time("no marker here", "time="), None);
     }

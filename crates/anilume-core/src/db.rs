@@ -512,7 +512,10 @@ mod tests {
         db.save_progress(&progress(2, 10.0, 1440.0)).unwrap();
 
         db.forget_anime("anilibria", "https://site/a/1").unwrap();
-        assert!(db.anime_progress("anilibria", "https://site/a/1").unwrap().is_empty());
+        assert!(db
+            .anime_progress("anilibria", "https://site/a/1")
+            .unwrap()
+            .is_empty());
     }
 
     fn library_entry(status: &str) -> LibraryEntry {
@@ -558,7 +561,10 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         db.library_upsert(&library_entry("watching")).unwrap();
         db.library_remove("yummy_anime", "https://y/a/7").unwrap();
-        assert!(db.library_get("yummy_anime", "https://y/a/7").unwrap().is_none());
+        assert!(db
+            .library_get("yummy_anime", "https://y/a/7")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

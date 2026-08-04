@@ -38,7 +38,6 @@ struct ProxyInner {
 impl ProxyHandle {
     pub async fn start() -> Result<Self> {
         let client = reqwest::Client::builder()
-
             .connect_timeout(Duration::from_secs(15))
             .pool_idle_timeout(Duration::from_secs(30))
             .build()
@@ -77,7 +76,9 @@ impl ProxyHandle {
 
     pub fn open_session(&self, headers: HashMap<String, String>) -> String {
         let session = uuid::Uuid::new_v4().to_string();
-        self.inner.sessions.insert(session.clone(), Arc::new(headers));
+        self.inner
+            .sessions
+            .insert(session.clone(), Arc::new(headers));
         session
     }
 
@@ -149,7 +150,10 @@ async fn handle_stream(
         builder = builder.header(name, value);
     }
 
-    builder = builder.header(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+    builder = builder.header(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_static("*"),
+    );
 
     let stream = response.bytes_stream().map_err(std::io::Error::other);
     builder
@@ -278,7 +282,10 @@ mod tests {
     }
 
     fn proxied(url: &str) -> String {
-        format!("http://127.0.0.1:9999/s/sess/{}", URL_SAFE_NO_PAD.encode(url))
+        format!(
+            "http://127.0.0.1:9999/s/sess/{}",
+            URL_SAFE_NO_PAD.encode(url)
+        )
     }
 
     fn decode_first_target(rendered: &str) -> String {
@@ -320,7 +327,8 @@ mod tests {
 
     #[test]
     fn variant_playlists_go_through_proxy() {
-        let playlist = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360\n360/index.m3u8\n";
+        let playlist =
+            "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360\n360/index.m3u8\n";
         let out = rewrite_playlist(playlist, &base(), proxied);
         assert!(out.contains("#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360"));
         assert_eq!(

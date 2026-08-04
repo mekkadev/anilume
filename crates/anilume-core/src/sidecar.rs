@@ -37,7 +37,10 @@ impl SidecarSpec {
             program: interpreter.into(),
             args: vec!["-m".into(), "anilume_sidecar".into()],
             env: vec![
-                ("PYTHONPATH".into(), package_root.to_string_lossy().into_owned()),
+                (
+                    "PYTHONPATH".into(),
+                    package_root.to_string_lossy().into_owned(),
+                ),
                 ("PYTHONUNBUFFERED".into(), "1".into()),
                 ("PYTHONIOENCODING".into(), "utf-8".into()),
             ],
@@ -123,7 +126,8 @@ impl SidecarClient {
             "method": method,
             "params": params,
         });
-        let mut line = serde_json::to_string(&request).map_err(|e| CoreError::Other(e.to_string()))?;
+        let mut line =
+            serde_json::to_string(&request).map_err(|e| CoreError::Other(e.to_string()))?;
         line.push('\n');
 
         {
