@@ -918,3 +918,46 @@
 .library-list {
   box-shadow: inset 0 0 0 1px var(--rule);
 }
+
+.section__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-row__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 1px;
+}
+
+.history-row__done {
+  color: var(--green);
+  font-weight: 550;
+}
+
+.menu__label {
+  padding: 7px 8px 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.menu__label:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--rule);
+  padding-top: 9px;
+}
+
+.player .menu__label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.player .menu__label:not(:first-child) {
+  border-top-color: rgba(255, 255, 255, 0.16);
+}

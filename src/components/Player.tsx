@@ -50,7 +50,11 @@ export function Player(props: { request: PlaybackRequest }) {
   const [speed, setSpeed] = createSignal(1);
   const [fullscreen, setFullscreen] = createSignal(false);
   const [controlsVisible, setControlsVisible] = createSignal(true);
-  const [menu, setMenu] = createSignal<"quality" | "speed" | null>(null);
+  const [menu, setMenu] = createSignal<"quality" | "speed" | "tracks" | null>(null);
+  const [audioTracks, setAudioTracks] = createSignal<{ name: string; lang?: string }[]>([]);
+  const [audioTrack, setAudioTrack] = createSignal(-1);
+  const [subtitleTracks, setSubtitleTracks] = createSignal<{ name: string; lang?: string }[]>([]);
+  const [subtitleTrack, setSubtitleTrack] = createSignal(-1);
   const [switchingTo, setSwitchingTo] = createSignal<number | null>(null);
 
   const episode = () => props.request.episodes[episodeIndex()];
@@ -85,7 +89,28 @@ export function Player(props: { request: PlaybackRequest }) {
           maxBufferLength: 40,
         });
         hls = instance;
+
+        const syncTracks = () => {
+          setAudioTracks(
+            instance.audioTracks.map((track) => ({
+              name: track.name || track.lang || "Дорожка",
+              lang: track.lang,
+            })),
+          );
+          setAudioTrack(instance.audioTrack);
+          setSubtitleTracks(
+            instance.subtitleTracks.map((track) => ({
+              name: track.name || track.lang || "Субтитры",
+              lang: track.lang,
+            })),
+          );
+          setSubtitleTrack(instance.subtitleTrack);
+        };
+
         instance.on(Hls.Events.MANIFEST_PARSED, applySeek);
+        instance.on(Hls.Events.MANIFEST_PARSED, syncTracks);
+        instance.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncTracks);
+        instance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, syncTracks);
         instance.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return;
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -100,6 +125,8 @@ export function Player(props: { request: PlaybackRequest }) {
         instance.loadSource(url);
         instance.attachMedia(video);
       } else {
+        setAudioTracks([]);
+        setSubtitleTracks([]);
         video.src = url;
         video.addEventListener("loadedmetadata", applySeek, { once: true });
       }
@@ -180,6 +207,19 @@ export function Player(props: { request: PlaybackRequest }) {
     setMenu(null);
     await load(target, resumeAt);
     if (!wasPlaying) video.pause();
+  }
+
+  function chooseAudio(index: number) {
+    if (hls) hls.audioTrack = index;
+    setAudioTrack(index);
+  }
+
+  function chooseSubtitle(index: number) {
+    if (hls) {
+      hls.subtitleTrack = index;
+      hls.subtitleDisplay = index >= 0;
+    }
+    setSubtitleTrack(index);
   }
 
   function togglePlay() {
@@ -493,6 +533,68 @@ export function Player(props: { request: PlaybackRequest }) {
               </div>
             </Show>
           </div>
+
+          <Show when={audioTracks().length > 1 || subtitleTracks().length > 0}>
+            <div class="menu">
+              <button
+                class="player-btn"
+                title="Дорожки и субтитры"
+                onClick={() => setMenu(menu() === "tracks" ? null : "tracks")}
+              >
+                <Icon name="subtitles" size={18} />
+              </button>
+              <Show when={menu() === "tracks"}>
+                <div class="menu__backdrop" onClick={() => setMenu(null)} />
+                <div class="menu__list menu__list--up menu__list--wide">
+                  <Show when={audioTracks().length > 1}>
+                    <div class="menu__label">Звук</div>
+                    <For each={audioTracks()}>
+                      {(track, index) => (
+                        <button
+                          class="menu__item"
+                          data-active={audioTrack() === index()}
+                          onClick={() => chooseAudio(index())}
+                        >
+                          {track.name}
+                          <Show when={audioTrack() === index()}>
+                            <Icon name="check" size={14} />
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </Show>
+
+                  <Show when={subtitleTracks().length > 0}>
+                    <div class="menu__label">Субтитры</div>
+                    <button
+                      class="menu__item"
+                      data-active={subtitleTrack() < 0}
+                      onClick={() => chooseSubtitle(-1)}
+                    >
+                      Выключены
+                      <Show when={subtitleTrack() < 0}>
+                        <Icon name="check" size={14} />
+                      </Show>
+                    </button>
+                    <For each={subtitleTracks()}>
+                      {(track, index) => (
+                        <button
+                          class="menu__item"
+                          data-active={subtitleTrack() === index()}
+                          onClick={() => chooseSubtitle(index())}
+                        >
+                          {track.name}
+                          <Show when={subtitleTrack() === index()}>
+                            <Icon name="check" size={14} />
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </Show>
+                </div>
+              </Show>
+            </div>
+          </Show>
 
           <button class="player-btn" onClick={() => void togglePip()} title="Картинка в картинке (P)">
             <Icon name="pip" size={19} />

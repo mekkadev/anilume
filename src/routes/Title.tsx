@@ -67,6 +67,7 @@ export function Title(props: { card: AnimeCard }) {
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [busyEpisode, setBusyEpisode] = createSignal<number | null>(null);
+  const [batch, setBatch] = createSignal<{ done: number; total: number } | null>(null);
   const [expanded, setExpanded] = createSignal(false);
 
   const progressFor = (ordinal: number): WatchProgress | undefined =>
@@ -213,6 +214,76 @@ export function Title(props: { card: AnimeCard }) {
       reportError(error);
     } finally {
       setBusyEpisode(null);
+    }
+  };
+
+  const downloadSeason = async () => {
+    const info = detail();
+    if (!info || batch()) return;
+
+    if (!(await api.downloadsAvailable())) {
+      pushToast("Не найден ffmpeg — скачивание недоступно", "error");
+      return;
+    }
+
+    const pending = info.episodes.filter((episode) => {
+      const saved = progressFor(episode.ordinal);
+      return !(saved && saved.durationSec > 0 && saved.positionSec >= saved.durationSec * 0.92);
+    });
+
+    if (pending.length === 0) {
+      pushToast("Все серии уже просмотрены", "info");
+      return;
+    }
+
+    setBatch({ done: 0, total: pending.length });
+    let queued = 0;
+    let failed = 0;
+
+    for (const episode of pending) {
+      try {
+        const studio = await resolveStudio(episode);
+        if (!studio) {
+          failed += 1;
+          continue;
+        }
+
+        const { videos } = await api.videos(studio.handle);
+        const target = videos[pickQualityIndex(videos, qualityPref())];
+        if (!target) {
+          failed += 1;
+          continue;
+        }
+
+        await api.downloadsEnqueue({
+          source: props.card.source,
+          animeKey: props.card.key,
+          animeTitle: info.title,
+          poster: info.poster,
+          episodeOrdinal: episode.ordinal,
+          episodeTitle: episode.title,
+          studio: studio.title,
+          quality: target.quality,
+          url: target.url,
+          headers: target.headers,
+        });
+        queued += 1;
+      } catch {
+        failed += 1;
+      }
+      setBatch({ done: queued + failed, total: pending.length });
+    }
+
+    setBatch(null);
+    if (queued === 0) {
+      pushToast("Ни одну серию не удалось поставить в очередь", "error");
+    } else {
+      pushToast(
+        failed === 0
+          ? `В очереди ${queued} ${plural(queued, "серия", "серии", "серий")}`
+          : `В очереди ${queued}, не вышло ${failed}`,
+        failed === 0 ? "success" : "info",
+      );
     }
   };
 
@@ -414,7 +485,30 @@ export function Title(props: { card: AnimeCard }) {
             <section class="section">
               <div class="section__head">
                 <h2 class="section__title">Серии</h2>
-                <div class="segment">
+                <div class="section__tools">
+                  <button
+                    class="btn"
+                    onClick={() => void downloadSeason()}
+                    disabled={batch() !== null || busyEpisode() !== null}
+                  >
+                    <Show
+                      when={batch()}
+                      fallback={
+                        <>
+                          <Icon name="download" size={14} />
+                          Скачать непросмотренные
+                        </>
+                      }
+                    >
+                      {(state) => (
+                        <>
+                          <span class="spinner" />
+                          {state().done} из {state().total}
+                        </>
+                      )}
+                    </Show>
+                  </button>
+                  <div class="segment">
                   <button
                     data-active={episodeOrder() === "asc"}
                     onClick={() => setEpisodeOrder("asc")}
@@ -427,6 +521,7 @@ export function Title(props: { card: AnimeCard }) {
                   >
                     Сначала новые
                   </button>
+                  </div>
                 </div>
               </div>
 

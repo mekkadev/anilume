@@ -245,6 +245,23 @@ impl Db {
             .collect())
     }
 
+    pub fn history(&self, limit: i64) -> Result<Vec<WatchProgress>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT * FROM watch_progress
+             ORDER BY updated_at DESC, episode_ordinal DESC
+             LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit], row_to_progress)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn clear_history(&self) -> Result<()> {
+        let conn = self.lock();
+        conn.execute("DELETE FROM watch_progress", [])?;
+        Ok(())
+    }
+
     pub fn forget_anime(&self, source: &str, anime_key: &str) -> Result<()> {
         let conn = self.lock();
         conn.execute(
@@ -529,6 +546,41 @@ mod tests {
             shikimori_id: Some(21),
             updated_at: 0,
         }
+    }
+
+    #[test]
+    fn history_lists_every_episode_newest_first() {
+        let db = Db::open_in_memory().unwrap();
+        db.save_progress(&progress(1, 100.0, 1440.0)).unwrap();
+        db.save_progress(&progress(2, 200.0, 1440.0)).unwrap();
+
+        let mut other = progress(5, 50.0, 1440.0);
+        other.anime_key = "https://site/a/2".into();
+        db.save_progress(&other).unwrap();
+
+        let history = db.history(10).unwrap();
+        assert_eq!(history.len(), 3);
+        assert_eq!(history[0].episode_ordinal, 5);
+    }
+
+    #[test]
+    fn history_respects_the_limit() {
+        let db = Db::open_in_memory().unwrap();
+        for episode in 1..=6 {
+            db.save_progress(&progress(episode, 10.0, 1440.0)).unwrap();
+        }
+        assert_eq!(db.history(3).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn clearing_history_leaves_the_library_alone() {
+        let db = Db::open_in_memory().unwrap();
+        db.save_progress(&progress(1, 100.0, 1440.0)).unwrap();
+        db.library_upsert(&library_entry("watching")).unwrap();
+
+        db.clear_history().unwrap();
+        assert!(db.history(10).unwrap().is_empty());
+        assert_eq!(db.library_list(None).unwrap().len(), 1);
     }
 
     #[test]
