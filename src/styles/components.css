@@ -161,7 +161,13 @@
   position: relative;
   margin: 0 -22px 26px;
   padding: 22px 22px 24px;
+}
+
+.hero__glow {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .hero__backdrop {
@@ -436,103 +442,6 @@
 .menu__item--danger:hover {
   background: var(--red);
   color: #fff;
-}
-
-.sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  animation: fade-in var(--fast) var(--ease-out);
-}
-
-.sheet__panel {
-  width: min(420px, 100%);
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--r-sheet);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-sheet);
-  animation: sheet-in var(--normal) var(--ease-spring);
-}
-
-@keyframes sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(-14px) scale(0.97);
-  }
-}
-
-.sheet__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 16px 16px 10px;
-}
-
-.sheet__title {
-  font-size: 15px;
-  font-weight: 650;
-}
-
-.sheet__sub {
-  color: var(--text-tertiary);
-  font-size: 12px;
-  margin-top: 1px;
-}
-
-.sheet__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 10px 14px;
-  overflow-y: auto;
-}
-
-.studio {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--r-md);
-  text-align: left;
-  color: var(--text);
-  transition: background var(--fast) var(--ease-out);
-}
-
-.studio:hover {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.studio__name {
-  font-weight: 500;
-  font-size: 13px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.studio__player {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  padding: 2px 7px;
-  border-radius: var(--r-full);
-  background: var(--fill);
-}
-
-.studio:hover .studio__player {
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .segment {
@@ -892,4 +801,116 @@
 .shortcut .kbd {
   min-width: 86px;
   text-align: center;
+}
+
+.dub-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dub {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-control);
+  font-size: 13px;
+  color: var(--text);
+  transition: background var(--fast) var(--ease-out), color var(--fast) var(--ease-out),
+    box-shadow var(--fast) var(--ease-out);
+}
+
+.dub:hover {
+  background: var(--fill-hover);
+}
+
+.dub[data-active="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.dub__name {
+  font-weight: 550;
+}
+
+.dub__player {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--r-full);
+  background: var(--fill);
+}
+
+.dub[data-active="true"] .dub__player {
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.menu__list--wide {
+  min-width: 268px;
+  padding: 6px;
+}
+
+.pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 8px;
+  font-size: 13px;
+}
+
+.pref--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  border-top: 0.5px solid var(--separator);
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.pref--stack .segment {
+  width: 100%;
+}
+
+.pref--stack .segment button {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--fill-active);
+  transition: background var(--normal) var(--ease-out);
+}
+
+.toggle[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform var(--normal) var(--ease-spring);
+}
+
+.toggle[aria-checked="true"] .toggle__knob {
+  transform: translateX(16px);
 }

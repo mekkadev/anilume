@@ -2,15 +2,30 @@ import {
   For,
   Show,
   createEffect,
+  createMemo,
   createResource,
   createSignal,
   onCleanup,
 } from "solid-js";
 
 import { Icon } from "../components/Icon";
-import { StudioSheet } from "../components/StudioSheet";
+import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
-import { episodesLabel } from "../lib/format";
+import { episodesLabel, plural, qualityLabel } from "../lib/format";
+import {
+  QUALITY_LABELS,
+  QUALITY_ORDER,
+  QUALITY_SHORT,
+  autoplayNext,
+  episodeOrder,
+  pickQualityIndex,
+  qualityPref,
+  rememberDub,
+  setAutoplayNext,
+  setEpisodeOrder,
+  setQualityPref,
+  setRememberDub,
+} from "../lib/prefs";
 import { openPlayer, pushToast, reportError, sourceName } from "../lib/store";
 import type {
   AnimeCard,
@@ -50,8 +65,7 @@ export function Title(props: { card: AnimeCard }) {
     ([source, key]) => api.libraryGet(source, key),
   );
 
-  const [pendingEpisode, setPendingEpisode] = createSignal<EpisodeInfo | null>(null);
-  const [studios, setStudios] = createSignal<StudioInfo[] | null>(null);
+  const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [busyEpisode, setBusyEpisode] = createSignal<number | null>(null);
   const [expanded, setExpanded] = createSignal(false);
 
@@ -69,54 +83,68 @@ export function Title(props: { card: AnimeCard }) {
     const index = episodes.findIndex((ep) => ep.ordinal === latest.episodeOrdinal);
     if (index < 0) return episodes[0];
 
-    const finished = latest.durationSec > 0 && latest.positionSec >= latest.durationSec * 0.92;
+    const finished =
+      latest.durationSec > 0 && latest.positionSec >= latest.durationSec * 0.92;
     return finished ? episodes[index + 1] ?? episodes[index] : episodes[index];
   };
 
-  const startEpisode = async (episode: EpisodeInfo, forcePick = false) => {
-    setBusyEpisode(episode.ordinal);
-    try {
-      const { studios: available } = await api.studios(episode.handle);
-      if (available.length === 0) {
-        pushToast("Для этой серии нет доступных плееров", "error");
-        return;
-      }
+  const [studios] = createResource(
+    () => nextEpisode()?.handle,
+    (handle) => api.studios(handle).then((result) => result.studios),
+  );
 
-      const remembered = await api.settingGet(
+  const orderedEpisodes = createMemo(() => {
+    const episodes = [...(detail()?.episodes ?? [])];
+    return episodeOrder() === "desc" ? episodes.reverse() : episodes;
+  });
+
+  createEffect(() => {
+    const available = studios();
+    if (!available || available.length === 0) return;
+    if (selectedDub() && available.some((item) => item.title === selectedDub())) return;
+
+    void (async () => {
+      const remembered = rememberDub()
+        ? await api.settingGet(studioSettingKey(props.card.source, props.card.key))
+        : null;
+      const match = available.find((item) => item.title === remembered);
+      setSelectedDub((match ?? available[0]!).title);
+    })();
+  });
+
+  const chooseDub = (studio: StudioInfo) => {
+    setSelectedDub(studio.title);
+    if (rememberDub()) {
+      void api.settingSet(
         studioSettingKey(props.card.source, props.card.key),
+        studio.title,
       );
-      const preferred = available.find((studio) => studio.title === remembered);
-
-      if (forcePick || (available.length > 1 && !preferred)) {
-        setPendingEpisode(episode);
-        setStudios(available);
-        return;
-      }
-
-      await launch(episode, preferred ?? available[0]!);
-    } catch (error) {
-      reportError(error);
-    } finally {
-      setBusyEpisode(null);
     }
   };
 
-  const launch = async (episode: EpisodeInfo, studio: StudioInfo) => {
+  async function resolveStudio(episode: EpisodeInfo): Promise<StudioInfo | null> {
+    const { studios: available } = await api.studios(episode.handle);
+    if (available.length === 0) {
+      pushToast("Для этой серии нет доступных плееров", "error");
+      return null;
+    }
+    return available.find((item) => item.title === selectedDub()) ?? available[0]!;
+  }
+
+  const play = async (episode: EpisodeInfo) => {
     const info = detail();
     if (!info) return;
 
     setBusyEpisode(episode.ordinal);
     try {
+      const studio = await resolveStudio(episode);
+      if (!studio) return;
+
       const { videos } = await api.videos(studio.handle);
       if (videos.length === 0) {
         pushToast(`«${studio.title}» не отдал видео — выберите другую озвучку`, "error");
         return;
       }
-
-      await api.settingSet(
-        studioSettingKey(props.card.source, props.card.key),
-        studio.title,
-      );
 
       const saved = progressFor(episode.ordinal);
       const resumeAt =
@@ -134,17 +162,17 @@ export function Title(props: { card: AnimeCard }) {
         studioTitle: studio.title,
         videos,
         startAt: resumeAt,
+        qualityIndex: pickQualityIndex(videos, qualityPref()),
+        autoplayNext: autoplayNext(),
       });
     } catch (error) {
       reportError(error);
     } finally {
       setBusyEpisode(null);
-      setPendingEpisode(null);
-      setStudios(null);
     }
   };
 
-  const downloadEpisode = async (episode: EpisodeInfo) => {
+  const download = async (episode: EpisodeInfo) => {
     const info = detail();
     if (!info) return;
 
@@ -155,21 +183,12 @@ export function Title(props: { card: AnimeCard }) {
         return;
       }
 
-      const { studios } = await api.studios(episode.handle);
-      if (studios.length === 0) {
-        pushToast("Для этой серии нет плееров", "error");
-        return;
-      }
-
-      const remembered = await api.settingGet(
-        studioSettingKey(props.card.source, props.card.key),
-      );
-      const studio =
-        studios.find((item) => item.title === remembered) ?? studios[0]!;
+      const studio = await resolveStudio(episode);
+      if (!studio) return;
 
       const { videos } = await api.videos(studio.handle);
-      const best = videos[0];
-      if (!best) {
+      const target = videos[pickQualityIndex(videos, qualityPref())];
+      if (!target) {
         pushToast("Озвучка не отдала видео", "error");
         return;
       }
@@ -182,11 +201,14 @@ export function Title(props: { card: AnimeCard }) {
         episodeOrdinal: episode.ordinal,
         episodeTitle: episode.title,
         studio: studio.title,
-        quality: best.quality,
-        url: best.url,
-        headers: best.headers,
+        quality: target.quality,
+        url: target.url,
+        headers: target.headers,
       });
-      pushToast(`Серия ${episode.ordinal} добавлена в загрузки`, "success");
+      pushToast(
+        `Серия ${episode.ordinal} в очереди · ${qualityLabel(target.quality)}`,
+        "success",
+      );
     } catch (error) {
       reportError(error);
     } finally {
@@ -240,10 +262,6 @@ export function Title(props: { card: AnimeCard }) {
     }
   };
 
-  createEffect(() => {
-    if (detail()) void refetchProgress();
-  });
-
   const onVisibility = () => {
     if (document.visibilityState === "visible") void refetchProgress();
   };
@@ -256,12 +274,14 @@ export function Title(props: { card: AnimeCard }) {
         {(info) => (
           <>
             <section class="hero">
-              <Show when={info().poster}>
-                <div
-                  class="hero__backdrop"
-                  style={{ "background-image": `url(${info().poster})` }}
-                />
-              </Show>
+              <div class="hero__glow">
+                <Show when={info().poster}>
+                  <div
+                    class="hero__backdrop"
+                    style={{ "background-image": `url(${info().poster})` }}
+                  />
+                </Show>
+              </div>
 
               <div class="hero__inner">
                 <div class="hero__poster">
@@ -279,7 +299,7 @@ export function Title(props: { card: AnimeCard }) {
                   <div class="hero__chips">
                     <Show when={info().meta.score}>
                       <span class="chip chip--warning">
-                        <Icon name="star" size={12} />
+                        <Icon name="star" size={11} />
                         {info().meta.score!.toFixed(1)}
                       </span>
                     </Show>
@@ -317,10 +337,10 @@ export function Title(props: { card: AnimeCard }) {
                       {(episode) => (
                         <button
                           class="btn btn--primary btn--lg"
-                          onClick={() => void startEpisode(episode())}
+                          onClick={() => void play(episode())}
                           disabled={busyEpisode() !== null}
                         >
-                          <Icon name="play" size={17} />
+                          <Icon name="play" size={15} />
                           {progressFor(episode().ordinal)
                             ? `Продолжить · серия ${episode().ordinal}`
                             : `Смотреть · серия ${episode().ordinal}`}
@@ -333,6 +353,8 @@ export function Title(props: { card: AnimeCard }) {
                       onPick={(status) => void setLibraryStatus(status)}
                       onRemove={() => void removeFromLibrary()}
                     />
+
+                    <ViewSettings />
                   </div>
                 </div>
               </div>
@@ -340,12 +362,76 @@ export function Title(props: { card: AnimeCard }) {
 
             <section class="section">
               <div class="section__head">
+                <h2 class="section__title">Озвучка</h2>
+                <Show when={studios()}>
+                  <span class="page-sub">
+                    {studios()!.length}{" "}
+                    {plural(studios()!.length, "вариант", "варианта", "вариантов")}
+                  </span>
+                </Show>
+              </div>
+
+              <Show
+                when={!studios.loading}
+                fallback={
+                  <div class="dub-row">
+                    <span class="spinner" />
+                    <span class="page-sub">Загружаем варианты озвучки…</span>
+                  </div>
+                }
+              >
+                <Show
+                  when={(studios() ?? []).length > 0}
+                  fallback={
+                    <div class="dub-row">
+                      <span class="page-sub">
+                        Источник не отдал плееров для этого тайтла
+                      </span>
+                    </div>
+                  }
+                >
+                  <div class="dub-row">
+                    <For each={studios()}>
+                      {(studio) => (
+                        <button
+                          class="dub"
+                          data-active={selectedDub() === studio.title}
+                          onClick={() => chooseDub(studio)}
+                        >
+                          <span class="dub__name">{studio.title}</span>
+                          <span class="dub__player">{studio.player}</span>
+                          <Show when={selectedDub() === studio.title}>
+                            <Icon name="check" size={14} />
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </Show>
+            </section>
+
+            <section class="section">
+              <div class="section__head">
                 <h2 class="section__title">Серии</h2>
-                <span class="page-sub">{episodesLabel(info().episodes.length)}</span>
+                <div class="segment">
+                  <button
+                    data-active={episodeOrder() === "asc"}
+                    onClick={() => setEpisodeOrder("asc")}
+                  >
+                    Сначала первые
+                  </button>
+                  <button
+                    data-active={episodeOrder() === "desc"}
+                    onClick={() => setEpisodeOrder("desc")}
+                  >
+                    Сначала новые
+                  </button>
+                </div>
               </div>
 
               <div class="episode-grid">
-                <For each={info().episodes}>
+                <For each={orderedEpisodes()}>
                   {(episode) => {
                     const saved = () => progressFor(episode.ordinal);
                     const percent = () => {
@@ -359,7 +445,7 @@ export function Title(props: { card: AnimeCard }) {
                       <div class="episode" data-watched={watched()}>
                         <button
                           class="episode__main"
-                          onClick={() => void startEpisode(episode)}
+                          onClick={() => void play(episode)}
                           disabled={busyEpisode() !== null}
                         >
                           <span class="episode__num">
@@ -367,7 +453,7 @@ export function Title(props: { card: AnimeCard }) {
                               when={busyEpisode() === episode.ordinal}
                               fallback={
                                 <Show when={watched()} fallback={episode.ordinal}>
-                                  <Icon name="check" size={15} />
+                                  <Icon name="check" size={14} />
                                 </Show>
                               }
                             >
@@ -379,20 +465,11 @@ export function Title(props: { card: AnimeCard }) {
 
                         <button
                           class="episode__pick"
-                          title="Выбрать озвучку"
-                          onClick={() => void startEpisode(episode, true)}
-                          disabled={busyEpisode() !== null}
-                        >
-                          <Icon name="subtitles" size={16} />
-                        </button>
-
-                        <button
-                          class="episode__pick"
                           title="Скачать серию"
-                          onClick={() => void downloadEpisode(episode)}
+                          onClick={() => void download(episode)}
                           disabled={busyEpisode() !== null}
                         >
-                          <Icon name="download" size={16} />
+                          <Icon name="download" size={15} />
                         </button>
 
                         <Show when={percent() > 1 && !watched()}>
@@ -409,17 +486,49 @@ export function Title(props: { card: AnimeCard }) {
           </>
         )}
       </Show>
+    </div>
+  );
+}
 
-      <Show when={studios() && pendingEpisode()}>
-        <StudioSheet
-          episode={pendingEpisode()!}
-          studios={studios()!}
-          onPick={(studio) => void launch(pendingEpisode()!, studio)}
-          onClose={() => {
-            setStudios(null);
-            setPendingEpisode(null);
-          }}
-        />
+function ViewSettings() {
+  const [open, setOpen] = createSignal(false);
+
+  return (
+    <div class="menu">
+      <button class="btn" onClick={() => setOpen(!open())} title="Настройки просмотра">
+        <Icon name="settings" size={15} />
+      </button>
+
+      <Show when={open()}>
+        <div class="menu__backdrop" onClick={() => setOpen(false)} />
+        <div class="menu__list menu__list--wide">
+          <div class="pref">
+            <span>Следующая серия сама</span>
+            <Toggle checked={autoplayNext()} onChange={setAutoplayNext} />
+          </div>
+
+          <div class="pref">
+            <span>Запоминать озвучку</span>
+            <Toggle checked={rememberDub()} onChange={setRememberDub} />
+          </div>
+
+          <div class="pref pref--stack">
+            <span>Качество по умолчанию</span>
+            <div class="segment">
+              <For each={QUALITY_ORDER}>
+                {(value) => (
+                  <button
+                    data-active={qualityPref() === value}
+                    title={QUALITY_LABELS[value]}
+                    onClick={() => setQualityPref(value)}
+                  >
+                    {QUALITY_SHORT[value]}
+                  </button>
+                )}
+              </For>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   );
@@ -435,7 +544,7 @@ function LibraryMenu(props: {
   return (
     <div class="menu">
       <button class="btn" onClick={() => setOpen(!open())}>
-        <Icon name="bookmark" size={16} />
+        <Icon name="bookmark" size={14} />
         {props.current ? LIBRARY_LABELS[props.current] : "В библиотеку"}
       </button>
 
@@ -454,7 +563,7 @@ function LibraryMenu(props: {
               >
                 {label}
                 <Show when={props.current === status}>
-                  <Icon name="check" size={15} />
+                  <Icon name="check" size={14} />
                 </Show>
               </button>
             )}
@@ -482,9 +591,9 @@ function TitleSkeleton() {
       <div class="hero__inner">
         <div class="hero__poster skeleton" />
         <div class="hero__body">
-          <div class="skeleton" style={{ height: "34px", width: "58%", "border-radius": "8px" }} />
-          <div class="skeleton" style={{ height: "16px", width: "34%", "border-radius": "6px", "margin-top": "14px" }} />
-          <div class="skeleton" style={{ height: "72px", width: "100%", "border-radius": "10px", "margin-top": "22px" }} />
+          <div class="skeleton" style={{ height: "30px", width: "58%", "border-radius": "7px" }} />
+          <div class="skeleton" style={{ height: "14px", width: "34%", "border-radius": "5px", "margin-top": "12px" }} />
+          <div class="skeleton" style={{ height: "64px", width: "100%", "border-radius": "9px", "margin-top": "20px" }} />
         </div>
       </div>
     </div>
