@@ -33,15 +33,15 @@ BUILDS: dict[str, Build] = {
         license="GPL-3.0",
     ),
     "x86_64-pc-windows-msvc": Build(
-        url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip",
-        sha256="c5dca7fbf8741a1d2b319f4d003d7370b7f518341990ee048d2d3d18be36d91c",
-        member="ffmpeg-master-latest-win64-lgpl/bin/ffmpeg.exe",
+        url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-lgpl-7.1.zip",
+        sha256="629cf603922003fec912b84a886fa08f1ba979e902df464161db160ff7a5ae22",
+        member="ffmpeg-n7.1-latest-win64-lgpl-7.1/bin/ffmpeg.exe",
         license="LGPL-3.0",
     ),
     "x86_64-unknown-linux-gnu": Build(
-        url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl.tar.xz",
-        sha256="576865849c1d34bd475332cb030a0b641df96536945d213ddd1232669b8244b7",
-        member="ffmpeg-master-latest-linux64-lgpl/bin/ffmpeg",
+        url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-lgpl-7.1.tar.xz",
+        sha256="6a64c20ca9bcccb8f832a941c1363caf86302384bbed8f1c2cc1303da2eb06b0",
+        member="ffmpeg-n7.1-latest-linux64-lgpl-7.1/bin/ffmpeg",
         license="LGPL-3.0",
     ),
 }
@@ -95,7 +95,18 @@ def extract(archive: Path, member: str, destination: Path) -> None:
         with destination.open("wb") as out:
             shutil.copyfileobj(source, out)
 
+def force_utf8_output() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 def main() -> int:
+    force_utf8_output()
     parser = argparse.ArgumentParser(description="Кладёт ffmpeg в src-tauri/binaries")
     parser.add_argument("--triple", help="целевая тройка, по умолчанию текущая")
     parser.add_argument(
@@ -124,7 +135,7 @@ def main() -> int:
     if build.sha256 and actual != build.sha256:
         archive.unlink(missing_ok=True)
         raise SystemExit(
-            "Контрольная сумма не совпала — upstream подменил файл.\n"
+            "Контрольная сумма не совпала — upstream пересобрал файл.\n"
             f"  ожидали: {build.sha256}\n"
             f"  получили: {actual}\n"
             "Проверьте источник и обновите закрепление осознанно."
