@@ -35,6 +35,13 @@ SOURCES: tuple[SourceInfo, ...] = (
         notes=("Требуется IP СНГ", "Больше всего вариантов озвучки"),
     ),
     SourceInfo(
+        key="animelib",
+        module="anilume_sidecar.animelib",
+        name="AnimeLib",
+        description="Каталог с десятком озвучек на серию, свой плеер до 4K и постеры в полном размере",
+        notes=("Свой плеер до 2160p", "Нужен токен для 4K", "Прямые mp4"),
+    ),
+    SourceInfo(
         key="anilibria",
         module="anicli_api.source.anilibria",
         name="AniLibria",
@@ -91,11 +98,14 @@ SOURCES: tuple[SourceInfo, ...] = (
 
 SOURCES_BY_KEY: dict[str, SourceInfo] = {s.key: s for s in SOURCES}
 
-DEFAULT_SOURCE = "anilibria"
+DEFAULT_SOURCE = "animelib"
 
 class ExtractorPool:
     def __init__(self) -> None:
         self._cache: dict[str, Any] = {}
+
+    def reset(self, source_key: str) -> None:
+        self._cache.pop(source_key, None)
 
     def get(self, source_key: str) -> Any:
         if source_key in self._cache:

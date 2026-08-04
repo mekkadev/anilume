@@ -11,7 +11,7 @@ import { Library } from "./routes/Library";
 import { Search } from "./routes/Search";
 import { Settings } from "./routes/Settings";
 import { Title } from "./routes/Title";
-import { loadPrefs } from "./lib/prefs";
+import { loadPrefs, restoreSourceConfig } from "./lib/prefs";
 import {
   canGoBack,
   goBack,
@@ -31,6 +31,7 @@ export function App() {
   onMount(() => {
     loadSources().catch(reportError);
     void loadPrefs().catch(() => undefined);
+    void restoreSourceConfig().catch(() => undefined);
 
     void import("@tauri-apps/plugin-os")
       .then(({ platform }) => {

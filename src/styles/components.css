@@ -961,3 +961,31 @@
 .player .menu__label:not(:first-child) {
   border-top-color: rgba(255, 255, 255, 0.16);
 }
+
+.panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.panel__rowlabel {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.hero__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--r-xs);
+  color: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}

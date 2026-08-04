@@ -69,6 +69,7 @@ def empty_meta() -> dict[str, Any]:
         "altTitle": None,
         "shikimoriId": None,
         "episodeDurationMin": None,
+        "tags": [],
     }
 
 def _meta_animego(raw: Any) -> dict[str, Any]:
@@ -118,8 +119,38 @@ def _meta_yummy(raw: Any) -> dict[str, Any]:
     )
     return meta
 
+def _meta_animelib(raw: Any) -> dict[str, Any]:
+    meta = empty_meta()
+    if not isinstance(raw, dict):
+        return meta
+
+    meta["year"] = _year_from_date(raw.get("releaseDate")) or _as_int(
+        raw.get("releaseDateString")
+    )
+    meta["genres"] = _names(raw.get("genres"), "name")
+    meta["score"] = _as_float(raw.get("rate_avg")) or _as_float(raw.get("shiki_rate"))
+    meta["episodesTotal"] = (
+        _as_int(_dig(raw, "items_count", "total"))
+        or _as_int(_dig(raw, "items_count", "uploaded"))
+        or _as_int(raw.get("episodes_count"))
+    )
+    meta["tags"] = _names(raw.get("tags"), "name")[:12]
+    meta["kind"] = _dig(raw, "type", "label")
+    meta["status"] = _dig(raw, "status", "label")
+    meta["ageRating"] = _dig(raw, "ageRestriction", "label")
+
+    other = raw.get("otherNames")
+    if isinstance(other, list) and other:
+        first = other[0]
+        meta["altTitle"] = first if isinstance(first, str) else None
+    if not meta["altTitle"]:
+        meta["altTitle"] = raw.get("eng_name") or raw.get("name")
+
+    return meta
+
 _META_EXTRACTORS: dict[str, Callable[[Any], dict[str, Any]]] = {
     "animego": _meta_animego,
+    "animelib": _meta_animelib,
     "anilibria": _meta_anilibria,
     "yummy_anime": _meta_yummy,
     "yummy_anime_org": _meta_yummy,

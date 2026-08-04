@@ -36,6 +36,20 @@ export const QUALITY_SHORT: Record<QualityPref, string> = {
   max: "Макс",
 };
 
+export async function restoreSourceConfig() {
+  const [token, server] = await Promise.all([
+    api.settingGet("animelib.token"),
+    api.settingGet("animelib.server"),
+  ]);
+
+  const values: Record<string, unknown> = {};
+  if (token) values.token = token;
+  if (server) values.server = server;
+  if (Object.keys(values).length === 0) return;
+
+  await api.sourceConfigSet("animelib", values);
+}
+
 export async function loadPrefs() {
   const [autoplay, quality, order, remember] = await Promise.all([
     api.settingGet(KEY_AUTOPLAY),

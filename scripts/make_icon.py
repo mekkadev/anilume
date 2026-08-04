@@ -16,17 +16,18 @@ SIZE = 1024
 SUPERSAMPLE = 2
 OUTPUT = Path(__file__).resolve().parents[1] / "src-tauri" / "icons" / "source.png"
 
-TOP_LEFT = (0x9B, 0x8C, 0xFF)
-BOTTOM_RIGHT = (0x3A, 0x2E, 0xB0)
-GLOW = (0xC9, 0xC0, 0xFF)
+VERMILION = (0xB8, 0x32, 0x1C)
+PAPER = (0xF6, 0xF4, 0xEF)
+INK = (0x17, 0x16, 0x0F)
 
 
 def mix(a, b, t):
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def rounded_rect_alpha(x, y, size, radius):
-    inset = size * 0.055
+def rounded_rect_alpha(x, y, size, radius, inset=None):
+    if inset is None:
+        inset = size * 0.055
     left, top = inset, inset
     right, bottom = size - inset, size - inset
 
@@ -41,8 +42,8 @@ def rounded_rect_alpha(x, y, size, radius):
 
 def in_triangle(x, y, size):
     cx, cy = size * 0.5, size * 0.5
-    height = size * 0.34
-    width = size * 0.30
+    height = size * 0.30
+    width = size * 0.26
 
     apex_x = cx + width * 0.62
     back_x = cx - width * 0.38
@@ -62,26 +63,29 @@ def render() -> bytes:
     big = SIZE * scale
     radius = big * 0.235
 
+    rule_outer = big * 0.088
+    rule_inner = rule_outer + big * 0.012
+
     accumulator = [[0] * (SIZE * 4) for _ in range(SIZE)]
 
     for by in range(big):
-        row_target = by // scale
-        target = accumulator[row_target]
+        target = accumulator[by // scale]
 
         for bx in range(big):
-            alpha = rounded_rect_alpha(bx, by, big, radius)
-            if alpha == 0.0:
+            if rounded_rect_alpha(bx, by, big, radius) == 0.0:
                 continue
 
-            diagonal = (bx + by) / (2 * big)
-            colour = mix(TOP_LEFT, BOTTOM_RIGHT, diagonal)
+            colour = VERMILION
 
-            glow_distance = math.hypot(bx - big * 0.30, by - big * 0.24) / (big * 0.62)
-            if glow_distance < 1:
-                colour = mix(colour, GLOW, (1 - glow_distance) ** 2 * 0.45)
+            on_rule = (
+                rounded_rect_alpha(bx, by, big, radius, inset=rule_outer) > 0
+                and rounded_rect_alpha(bx, by, big, radius, inset=rule_inner) == 0
+            )
+            if on_rule:
+                colour = PAPER
 
             if in_triangle(bx, by, big):
-                colour = (0xFF, 0xFF, 0xFF)
+                colour = PAPER
 
             index = (bx // scale) * 4
             target[index] += colour[0]
@@ -96,7 +100,6 @@ def render() -> bytes:
         raw.extend(min(255, value // samples) for value in row)
 
     return bytes(raw)
-
 
 def chunk(tag: bytes, payload: bytes) -> bytes:
     return (
