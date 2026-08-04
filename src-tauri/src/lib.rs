@@ -62,6 +62,8 @@ pub fn run() {
             commands::progress_for_anime,
             commands::continue_watching,
             commands::forget_anime,
+            commands::watch_history,
+            commands::clear_history,
             commands::library_list,
             commands::library_get,
             commands::library_upsert,

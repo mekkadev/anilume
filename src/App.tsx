@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { Downloads } from "./routes/Downloads";
 import { Home } from "./routes/Home";
+import { History } from "./routes/History";
 import { Library } from "./routes/Library";
 import { Search } from "./routes/Search";
 import { Settings } from "./routes/Settings";
@@ -128,6 +129,9 @@ export function App() {
               </Match>
               <Match when={matchRoute(route(), "library")}>
                 <Library />
+              </Match>
+              <Match when={matchRoute(route(), "history")}>
+                <History />
               </Match>
               <Match when={matchRoute(route(), "downloads")}>
                 <Downloads />

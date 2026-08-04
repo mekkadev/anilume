@@ -53,7 +53,7 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 35, sidecar, no network
-cargo test -p anilume-core      # 62, includes a real proxy round-trip
+cargo test -p anilume-core      # 65, includes a real proxy round-trip
 npm run typecheck
 ```
 

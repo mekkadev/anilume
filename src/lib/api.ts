@@ -84,6 +84,10 @@ export const api = {
   continueWatching: (limit = 20) =>
     call<ContinueItem[]>("continue_watching", { limit }),
 
+  watchHistory: (limit = 200) => call<WatchProgress[]>("watch_history", { limit }),
+
+  clearHistory: () => call<void>("clear_history"),
+
   forgetAnime: (source: string, animeKey: string) =>
     call<void>("forget_anime", { source, animeKey }),
 

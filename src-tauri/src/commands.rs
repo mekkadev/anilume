@@ -132,6 +132,20 @@ pub async fn continue_watching(
 }
 
 #[tauri::command]
+pub async fn watch_history(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> Answer<Vec<WatchProgress>> {
+    Ok(state.db.history(limit.unwrap_or(200))?)
+}
+
+#[tauri::command]
+pub async fn clear_history(state: State<'_, AppState>) -> Answer<()> {
+    state.db.clear_history()?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn forget_anime(
     state: State<'_, AppState>,
     source: String,
