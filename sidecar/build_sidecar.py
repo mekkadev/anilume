@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""Собирает сайдкар в один исполняемый файл для бандла Tauri.
-
-Tauri ищет внешние бинарники по имени с суффиксом целевой тройки, например
-`anilume-sidecar-aarch64-apple-darwin`. Скрипт определяет тройку через
-`rustc -vV` и кладёт результат в `src-tauri/binaries/`.
-
-    python3 sidecar/build_sidecar.py
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -21,8 +11,6 @@ SIDECAR_ROOT = REPO_ROOT / "sidecar"
 OUTPUT_DIR = REPO_ROOT / "src-tauri" / "binaries"
 BASE_NAME = "anilume-sidecar"
 
-# Парсеры anicli-api подтягиваются по строковому пути внутри библиотеки,
-# поэтому статический анализ PyInstaller их не видит.
 HIDDEN_IMPORTS = (
     "anicli_api.source.animego",
     "anicli_api.source.anilibria",
@@ -43,7 +31,6 @@ HIDDEN_IMPORTS = (
     "anicli_api.player.sovetromantica_embed",
 )
 
-
 def target_triple() -> str:
     try:
         out = subprocess.run(
@@ -58,7 +45,6 @@ def target_triple() -> str:
         if line.startswith("host:"):
             return line.split(":", 1)[1].strip()
     raise SystemExit("В выводе `rustc -vV` нет строки host")
-
 
 def build(triple: str, clean: bool) -> Path:
     work_dir = SIDECAR_ROOT / "build"
@@ -82,7 +68,7 @@ def build(triple: str, clean: bool) -> Path:
         str(work_dir),
         "--specpath",
         str(work_dir),
-        # Сайдкар общается по stdio и не должен открывать окно консоли на Windows.
+
         "--console",
     ]
     for module in HIDDEN_IMPORTS:
@@ -102,7 +88,6 @@ def build(triple: str, clean: bool) -> Path:
     destination.chmod(0o755)
     return destination
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--triple", help="переопределить целевую тройку")
@@ -114,7 +99,6 @@ def main() -> int:
     size_mb = destination.stat().st_size / 1024 / 1024
     print(f"Готово: {destination} ({size_mb:.1f} МБ)")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

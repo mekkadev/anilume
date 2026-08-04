@@ -1,12 +1,3 @@
-"""LRU-реестр объектов anicli-api.
-
-Объекты anicli-api связаны в цепочку и хранят состояние: получить эпизоды
-можно только у живого объекта `Anime`, полученного из `Search`. Адресовать
-их по ID нельзя, поэтому мы держим их в памяти и выдаём наружу строковые
-хендлы. Реестр ограничен по размеру — старые объекты вытесняются, и клиент
-получает `HANDLE_EXPIRED`, после чего повторяет путь от поиска.
-"""
-
 from __future__ import annotations
 
 import itertools
@@ -17,16 +8,12 @@ from .protocol import HandleExpired
 
 DEFAULT_CAPACITY = 512
 
-
 class Entry(NamedTuple):
     kind: str
-    """Тип объекта: search, ongoing, anime, episode, source."""
 
     source_key: str
-    """Ключ источника, из которого объект получен."""
 
     obj: Any
-
 
 class HandleRegistry:
     def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
@@ -48,7 +35,7 @@ class HandleRegistry:
             raise HandleExpired(handle)
         if expected_kind is not None and entry.kind != expected_kind:
             raise HandleExpired(handle)
-        # Обращение освежает запись, чтобы активный тайтл не вытеснялся.
+
         self._entries.move_to_end(handle)
         return entry
 

@@ -1,5 +1,3 @@
-"""Прикладные методы, которые сайдкар отдаёт наружу по JSON-RPC."""
-
 from __future__ import annotations
 
 import asyncio
@@ -19,8 +17,6 @@ from .sources import DEFAULT_SOURCE, SOURCES, SOURCES_BY_KEY, ExtractorPool
 log = logging.getLogger("anilume.service")
 
 UPSTREAM_TIMEOUT = 30.0
-"""Потолок на один сетевой поход к источнику. Парсеры иногда виснут на редиректах."""
-
 
 def _require(params: dict[str, Any], name: str) -> Any:
     value = params.get(name)
@@ -28,13 +24,7 @@ def _require(params: dict[str, Any], name: str) -> Any:
         raise RpcError(INVALID_PARAMS, f"Не передан обязательный параметр «{name}»")
     return value
 
-
 async def _call(source_key: str, what: str, coro: Any) -> Any:
-    """Единая обёртка над сетевыми вызовами anicli-api.
-
-    Парсеры бросают что угодно — от httpx-таймаутов до IndexError на
-    изменившейся вёрстке. Наружу отдаём одну понятную ошибку.
-    """
     info = SOURCES_BY_KEY.get(source_key)
     name = info.name if info else source_key
     try:
@@ -47,7 +37,7 @@ async def _call(source_key: str, what: str, coro: Any) -> Any:
         ) from exc
     except RpcError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("source=%s op=%s failed: %r", source_key, what, exc)
         hint = None
         if info and info.geo_restricted:
@@ -58,13 +48,10 @@ async def _call(source_key: str, what: str, coro: Any) -> Any:
             {"source": source_key, "op": what, "reason": str(exc), "hint": hint},
         ) from exc
 
-
 class AnilumeService:
     def __init__(self, registry: HandleRegistry | None = None) -> None:
         self.handles = registry or HandleRegistry()
         self.pool = ExtractorPool()
-
-    # -- служебное ---------------------------------------------------------
 
     async def ping(self, _: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -76,8 +63,6 @@ class AnilumeService:
 
     async def sources_list(self, _: dict[str, Any]) -> dict[str, Any]:
         return {"sources": [s.to_json() for s in SOURCES], "default": DEFAULT_SOURCE}
-
-    # -- каталог -----------------------------------------------------------
 
     async def catalog_ongoing(self, params: dict[str, Any]) -> dict[str, Any]:
         source_key = params.get("source") or DEFAULT_SOURCE
@@ -93,11 +78,6 @@ class AnilumeService:
         return {"items": self._cards(items, "search", source_key), "query": query}
 
     async def catalog_search_multi(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Ищет во всех выбранных источниках параллельно.
-
-        Один упавший источник не должен ронять всю выдачу — его ошибка
-        возвращается отдельным списком, чтобы UI мог показать её ненавязчиво.
-        """
         query = str(_require(params, "query")).strip()
         requested = params.get("sources") or [DEFAULT_SOURCE]
         if not isinstance(requested, list):
@@ -122,14 +102,7 @@ class AnilumeService:
                 groups.append({"source": source_key, "items": outcome})
         return {"query": query, "groups": groups, "failures": failures}
 
-    # -- тайтл -------------------------------------------------------------
-
     async def anime_get(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Разворачивает карточку в полный тайтл вместе со списком серий.
-
-        Серии тянем сразу: UI всё равно показывает их на той же странице,
-        а лишний раунд-трип до сайдкара — это заметная задержка.
-        """
         handle = str(_require(params, "handle"))
         entry = self.handles.get(handle)
         if entry.kind not in ("search", "ongoing"):
@@ -159,7 +132,6 @@ class AnilumeService:
         }
 
     async def episode_studios(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Варианты озвучки/плееров для серии."""
         handle = str(_require(params, "handle"))
         entry = self.handles.get(handle, "episode")
         studios = await _call(entry.source_key, "sources", entry.obj.a_get_sources())
@@ -171,16 +143,13 @@ class AnilumeService:
         }
 
     async def studio_videos(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Финальный шаг: прямые ссылки на видео с заголовками для прокси."""
         handle = str(_require(params, "handle"))
         entry = self.handles.get(handle, "source")
         videos = await _call(entry.source_key, "videos", entry.obj.a_get_videos())
         items = [dto.video(v) for v in videos]
-        # Лучшее качество первым — UI по умолчанию берёт нулевой элемент.
+
         items.sort(key=lambda v: v["quality"], reverse=True)
         return {"videos": items}
-
-    # -- внутреннее --------------------------------------------------------
 
     def _cards(self, items: Any, kind: str, source_key: str) -> list[dict[str, Any]]:
         return [
