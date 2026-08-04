@@ -141,7 +141,7 @@
   border-radius: 50%;
   background: #fff;
   transform: translate(50%, -50%) scale(0);
-  transition: transform var(--fast) var(--ease-spring);
+  transition: transform var(--fast) var(--ease-out);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
