@@ -1,9 +1,3 @@
-"""Двойники объектов anicli-api.
-
-Настоящие экстракторы ходят в сеть и требуют IP СНГ, поэтому вся логика
-сайдкара проверяется на подделках с той же формой API.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -13,8 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from anilume_sidecar.service import AnilumeService  # noqa: E402
-
+from anilume_sidecar.service import AnilumeService
 
 class FakeVideo:
     def __init__(self, quality: int, url: str, type_: str = "m3u8", headers=None):
@@ -22,7 +15,6 @@ class FakeVideo:
         self.url = url
         self.type = type_
         self.headers = headers or {}
-
 
 class FakeSource:
     def __init__(self, title: str, url: str, videos=None, fail: bool = False):
@@ -36,7 +28,6 @@ class FakeSource:
             raise RuntimeError("player is dead")
         return self._videos
 
-
 class FakeEpisode:
     def __init__(self, ordinal: int, title: str, sources=None):
         self.ordinal = ordinal
@@ -45,7 +36,6 @@ class FakeEpisode:
 
     async def a_get_sources(self):
         return self._sources
-
 
 class FakeAnime:
     def __init__(self, title, thumbnail, description, episodes=None, data=None):
@@ -58,7 +48,6 @@ class FakeAnime:
 
     async def a_get_episodes(self):
         return self._episodes
-
 
 class FakeCard:
     def __init__(self, title, url, thumbnail="", anime=None, data=None, episode=None, dub=None):
@@ -78,7 +67,6 @@ class FakeCard:
             raise RuntimeError("layout changed")
         return self._anime
 
-
 class FakeExtractor:
     def __init__(self, cards=None, ongoing=None, fail_search: bool = False):
         self._cards = cards or []
@@ -92,7 +80,6 @@ class FakeExtractor:
 
     async def a_ongoing(self):
         return self._ongoing
-
 
 ANILIBRIA_RAW = {
     "id": 9000,
@@ -127,16 +114,12 @@ ANIMEGO_RAW = {
     "alternateName": "Alternate Name",
 }
 
-
 @pytest.fixture
 def service():
     return AnilumeService()
 
-
 @pytest.fixture
 def wire(service):
-    """Подменяет экстрактор конкретного источника внутри сервиса."""
-
     def _wire(source_key: str, extractor):
         service.pool._cache[source_key] = extractor
         return extractor

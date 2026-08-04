@@ -1,23 +1,9 @@
-"""Нормализация объектов anicli-api в стабильный JSON для UI.
-
-Каждый источник кладёт свои сырые метаданные в разное поле и в разной форме
-(`raw_json` у animego, `data` у остальных), поэтому приведение к общей форме
-живёт здесь. Всё читается защитно: если парсер источника изменится, мы
-потеряем часть метаданных, но не упадём.
-"""
-
 from __future__ import annotations
 
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
-# ---------------------------------------------------------------------------
-# Вспомогательные безопасные геттеры
-# ---------------------------------------------------------------------------
-
-
 def _dig(obj: Any, *path: str) -> Any:
-    """Достаёт вложенное значение, не падая на отсутствующих ключах."""
     current = obj
     for key in path:
         if not isinstance(current, dict):
@@ -27,7 +13,6 @@ def _dig(obj: Any, *path: str) -> Any:
             return None
     return current
 
-
 def _as_int(value: Any) -> int | None:
     try:
         if value is None or isinstance(value, bool):
@@ -35,7 +20,6 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
 
 def _as_float(value: Any) -> float | None:
     try:
@@ -46,16 +30,12 @@ def _as_float(value: Any) -> float | None:
         return None
     return result if result > 0 else None
 
-
 def _year_from_date(value: Any) -> int | None:
-    """`datePublished` приходит как ISO-строка вида 2023-10-05."""
     if not isinstance(value, str) or len(value) < 4:
         return None
     return _as_int(value[:4])
 
-
 def _names(items: Any, *keys: str) -> list[str]:
-    """Собирает список названий из списка словарей по первому подходящему ключу."""
     if not isinstance(items, list):
         return []
     result: list[str] = []
@@ -70,15 +50,12 @@ def _names(items: Any, *keys: str) -> list[str]:
                 break
     return result
 
-
 def _raw_of(obj: Any) -> Any:
-    """Сырые метаданные тайтла: animego кладёт их в raw_json, остальные — в data."""
     for attr in ("raw_json", "data"):
         value = getattr(obj, attr, None)
         if value is not None:
             return value
     return None
-
 
 def empty_meta() -> dict[str, Any]:
     return {
@@ -94,12 +71,6 @@ def empty_meta() -> dict[str, Any]:
         "episodeDurationMin": None,
     }
 
-
-# ---------------------------------------------------------------------------
-# Извлечение метаданных по источникам
-# ---------------------------------------------------------------------------
-
-
 def _meta_animego(raw: Any) -> dict[str, Any]:
     meta = empty_meta()
     if not isinstance(raw, dict):
@@ -111,7 +82,6 @@ def _meta_animego(raw: Any) -> dict[str, Any]:
     meta["ageRating"] = raw.get("contentRating") or None
     meta["altTitle"] = raw.get("alternateName") or None
     return meta
-
 
 def _meta_anilibria(raw: Any) -> dict[str, Any]:
     meta = empty_meta()
@@ -132,7 +102,6 @@ def _meta_anilibria(raw: Any) -> dict[str, Any]:
         meta["status"] = "Вышел"
     return meta
 
-
 def _meta_yummy(raw: Any) -> dict[str, Any]:
     meta = empty_meta()
     if not isinstance(raw, dict):
@@ -143,12 +112,11 @@ def _meta_yummy(raw: Any) -> dict[str, Any]:
     meta["status"] = _dig(raw, "anime_status", "title")
     meta["ageRating"] = _dig(raw, "min_age", "title")
     meta["shikimoriId"] = _as_int(_dig(raw, "remote_ids", "shikimori_id"))
-    # Своя оценка сайта надёжнее агрегатов; шикимори-рейтинг — запасной вариант.
+
     meta["score"] = _as_float(_dig(raw, "rating", "average")) or _as_float(
         _dig(raw, "rating", "shikimori_rating")
     )
     return meta
-
 
 _META_EXTRACTORS: dict[str, Callable[[Any], dict[str, Any]]] = {
     "animego": _meta_animego,
@@ -157,19 +125,16 @@ _META_EXTRACTORS: dict[str, Callable[[Any], dict[str, Any]]] = {
     "yummy_anime_org": _meta_yummy,
 }
 
-
 def extract_meta(source_key: str, obj: Any) -> dict[str, Any]:
     extractor = _META_EXTRACTORS.get(source_key)
     if extractor is None:
         return empty_meta()
     try:
         return extractor(_raw_of(obj))
-    except Exception:  # noqa: BLE001 — метаданные не должны ронять выдачу
+    except Exception:
         return empty_meta()
 
-
 def _best_poster(source_key: str, obj: Any) -> str | None:
-    """У некоторых источников в сырых данных лежит постер лучшего качества."""
     raw = _raw_of(obj)
     if isinstance(raw, dict):
         if source_key.startswith("yummy"):
@@ -185,14 +150,7 @@ def _best_poster(source_key: str, obj: Any) -> str | None:
     thumbnail = getattr(obj, "thumbnail", None)
     return thumbnail or None
 
-
-# ---------------------------------------------------------------------------
-# Публичные конвертеры
-# ---------------------------------------------------------------------------
-
-
 def card(obj: Any, handle: str, source_key: str) -> dict[str, Any]:
-    """Карточка тайтла для сеток каталога и результатов поиска."""
     episode = getattr(obj, "episode", None)
     dub = getattr(obj, "dub", None)
     return {
@@ -200,14 +158,12 @@ def card(obj: Any, handle: str, source_key: str) -> dict[str, Any]:
         "source": source_key,
         "title": getattr(obj, "title", "") or "Без названия",
         "poster": _best_poster(source_key, obj),
-        # url источника стабилен между запусками — используем его как ключ
-        # тайтла в локальной БД истории и библиотеки.
+
         "key": getattr(obj, "url", "") or "",
         "episodeBadge": episode or None,
         "dubBadge": dub or None,
         "meta": extract_meta(source_key, obj),
     }
-
 
 def anime_detail(obj: Any, handle: str, source_key: str, key: str) -> dict[str, Any]:
     return {
@@ -220,7 +176,6 @@ def anime_detail(obj: Any, handle: str, source_key: str, key: str) -> dict[str, 
         "meta": extract_meta(source_key, obj),
     }
 
-
 def episode(obj: Any, handle: str) -> dict[str, Any]:
     ordinal = _as_int(getattr(obj, "ordinal", None))
     title = (getattr(obj, "title", "") or "").strip()
@@ -230,9 +185,7 @@ def episode(obj: Any, handle: str) -> dict[str, Any]:
         "title": title or (f"Серия {ordinal}" if ordinal is not None else "Серия"),
     }
 
-
 def studio(obj: Any, handle: str) -> dict[str, Any]:
-    """`Source` в терминах anicli-api — это вариант озвучки на конкретном плеере."""
     url = getattr(obj, "url", "") or ""
     hostname = urlsplit(url).hostname or ""
     return {
@@ -242,9 +195,7 @@ def studio(obj: Any, handle: str) -> dict[str, Any]:
         "url": url,
     }
 
-
 def video(obj: Any) -> dict[str, Any]:
-    """`Video` из anicli-api: прямая ссылка плюс заголовки, нужные прокси."""
     headers = getattr(obj, "headers", None)
     return {
         "type": getattr(obj, "type", "m3u8"),

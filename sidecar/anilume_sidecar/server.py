@@ -1,13 +1,3 @@
-"""Цикл JSON-RPC поверх stdio.
-
-Формат: одно JSON-сообщение на строку. Запросы обрабатываются конкурентно —
-парсинг источников это в основном ожидание сети, и последовательная очередь
-превратила бы открытие тайтла в заметную паузу.
-
-stdin читается отдельным потоком, а не через asyncio-пайпы: на Windows
-`connect_read_pipe` для стандартного ввода не поддерживается.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -32,7 +22,6 @@ log = logging.getLogger("anilume.server")
 
 _SHUTDOWN = object()
 
-
 class StdioServer:
     def __init__(self, service: AnilumeService | None = None) -> None:
         self.service = service or AnilumeService()
@@ -40,13 +29,9 @@ class StdioServer:
         self._write_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[Any]] = set()
 
-    # -- ввод/вывод --------------------------------------------------------
-
     async def _emit(self, message: dict[str, Any]) -> None:
         line = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
         async with self._write_lock:
-            # stdout буферизован — без flush ответ может застрять в буфере,
-            # и хост будет ждать его до таймаута.
             sys.stdout.write(line + "\n")
             sys.stdout.flush()
 
@@ -55,14 +40,12 @@ class StdioServer:
             try:
                 for raw in sys.stdin:
                     loop.call_soon_threadsafe(queue.put_nowait, raw)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("stdin reader stopped: %r", exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, _SHUTDOWN)
 
         threading.Thread(target=reader, name="anilume-stdin", daemon=True).start()
-
-    # -- обработка запросов ------------------------------------------------
 
     async def _handle(self, request: dict[str, Any]) -> None:
         request_id = request.get("id")
@@ -95,7 +78,7 @@ class StdioServer:
             await self._emit(err(request_id, exc))
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("method=%s crashed", method)
             await self._emit(
                 err(request_id, RpcError(INTERNAL_ERROR, "Внутренняя ошибка сайдкара",
@@ -135,15 +118,13 @@ class StdioServer:
 
             self._track(self._handle(request))
 
-        # Хост закрыл stdin. Даём незавершённым запросам короткий шанс ответить.
         if self._tasks:
             await asyncio.wait(set(self._tasks), timeout=5.0)
-
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO,
-        stream=sys.stderr,  # stdout занят протоколом
+        stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     argv = sys.argv[1:] if argv is None else argv

@@ -1,10 +1,3 @@
-"""Реестр доступных источников аниме.
-
-Каждый источник — модуль anicli-api с классом `Extractor`. Экстракторы
-создаются лениво и переиспользуются: внутри они держат HTTP-клиент с
-пулом соединений, пересоздавать их на каждый запрос дорого.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -13,7 +6,6 @@ from typing import Any
 
 from .protocol import RpcError, SOURCE_UNAVAILABLE
 
-
 @dataclass(frozen=True)
 class SourceInfo:
     key: str
@@ -21,7 +13,6 @@ class SourceInfo:
     name: str
     description: str
     geo_restricted: bool = False
-    """Источник или его плееры отдают контент только с IP СНГ."""
 
     notes: tuple[str, ...] = field(default_factory=tuple)
 
@@ -33,7 +24,6 @@ class SourceInfo:
             "geoRestricted": self.geo_restricted,
             "notes": list(self.notes),
         }
-
 
 SOURCES: tuple[SourceInfo, ...] = (
     SourceInfo(
@@ -102,12 +92,8 @@ SOURCES: tuple[SourceInfo, ...] = (
 SOURCES_BY_KEY: dict[str, SourceInfo] = {s.key: s for s in SOURCES}
 
 DEFAULT_SOURCE = "anilibria"
-"""Источник по умолчанию: единственный, который стабильно работает без IP СНГ."""
-
 
 class ExtractorPool:
-    """Ленивый кеш экстракторов по ключу источника."""
-
     def __init__(self) -> None:
         self._cache: dict[str, Any] = {}
 
@@ -126,7 +112,7 @@ class ExtractorPool:
         try:
             module = import_module(info.module)
             extractor = module.Extractor()
-        except Exception as exc:  # noqa: BLE001 — превращаем в доменную ошибку
+        except Exception as exc:
             raise RpcError(
                 SOURCE_UNAVAILABLE,
                 f"Не удалось загрузить источник «{info.name}»",
