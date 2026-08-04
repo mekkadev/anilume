@@ -73,7 +73,8 @@ def build(triple: str, clean: bool) -> Path:
     ]
     for module in HIDDEN_IMPORTS:
         command += ["--hidden-import", module]
-    command.append(str(SIDECAR_ROOT / "anilume_sidecar" / "__main__.py"))
+    command += ["--paths", str(SIDECAR_ROOT)]
+    command.append(str(SIDECAR_ROOT / "entrypoint.py"))
 
     subprocess.run(command, check=True, cwd=SIDECAR_ROOT)
 
@@ -89,6 +90,11 @@ def build(triple: str, clean: bool) -> Path:
     return destination
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--triple", help="переопределить целевую тройку")
     parser.add_argument("--no-clean", action="store_true", help="не чистить build/ и dist/")

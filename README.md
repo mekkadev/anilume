@@ -52,7 +52,7 @@ npm run app:build        # bundle
 ```
 
 ```bash
-pytest                          # 33, sidecar, no network
+pytest                          # 35, sidecar, no network
 cargo test -p anilume-core      # 62, includes a real proxy round-trip
 npm run typecheck
 ```
@@ -99,7 +99,7 @@ files land in `~/Videos/anilume/<title>/<title> - 03 серия [dub] [1080p].mp
 - **parsers break.** sites change their markup and anicli-api catches up on its own schedule. when a source fails, the app names it and suggests another rather than pretending nothing happened.
 - **animego, kodik and aniboom want a cis ip.** anilibria and yummy anime do not, which is why anilibria is the default.
 - **handles do not survive a restart.** the app re-resolves by title search, which is fast but can land on the wrong entry if a catalogue has near-duplicates.
-- **the sidecar is python.** pyinstaller adds roughly 40 mb to the bundle. porting eleven extractors to rust to avoid it was not worth doing twice.
+- **the sidecar is python.** pyinstaller adds about 17 mb to the bundle. porting nine extractors to rust to avoid it was not worth doing twice.
 - **neither build is signed.** see install.
 - **not a library.** it plays what public sources already serve; it hosts and decrypts nothing.
 

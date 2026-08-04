@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sys
 import threading
-from typing import Any
+from typing import Any, TextIO
 
 from .protocol import (
     INTERNAL_ERROR,
@@ -22,18 +23,38 @@ log = logging.getLogger("anilume.server")
 
 _SHUTDOWN = object()
 
+def claim_stdout() -> TextIO:
+    try:
+        channel = os.fdopen(
+            os.dup(sys.stdout.fileno()),
+            "w",
+            encoding="utf-8",
+            errors="replace",
+            newline="\n",
+        )
+    except (AttributeError, OSError, ValueError):
+        return sys.stdout
+
+    sys.stdout = sys.stderr
+    return channel
+
 class StdioServer:
-    def __init__(self, service: AnilumeService | None = None) -> None:
+    def __init__(
+        self,
+        service: AnilumeService | None = None,
+        channel: TextIO | None = None,
+    ) -> None:
         self.service = service or AnilumeService()
         self.methods = self.service.dispatch_table()
+        self.channel = channel or sys.stdout
         self._write_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[Any]] = set()
 
     async def _emit(self, message: dict[str, Any]) -> None:
         line = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
         async with self._write_lock:
-            sys.stdout.write(line + "\n")
-            sys.stdout.flush()
+            self.channel.write(line + "\n")
+            self.channel.flush()
 
     def _spawn_reader(self, queue: asyncio.Queue[Any], loop: asyncio.AbstractEventLoop) -> None:
         def reader() -> None:
@@ -121,7 +142,19 @@ class StdioServer:
         if self._tasks:
             await asyncio.wait(set(self._tasks), timeout=5.0)
 
+def force_utf8_streams() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 def main(argv: list[str] | None = None) -> int:
+    force_utf8_streams()
+    channel = claim_stdout()
     logging.basicConfig(
         level=logging.INFO,
         stream=sys.stderr,
@@ -131,11 +164,12 @@ def main(argv: list[str] | None = None) -> int:
     if "--version" in argv:
         from . import __version__
 
-        print(__version__)
+        channel.write(f"{__version__}\n")
+        channel.flush()
         return 0
 
     try:
-        asyncio.run(StdioServer().run())
+        asyncio.run(StdioServer(channel=channel).run())
     except KeyboardInterrupt:
         return 0
     return 0
