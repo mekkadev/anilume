@@ -1,0 +1,32 @@
+{
+  "name": "anilume",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Кроссплатформенный десктоп-клиент для просмотра аниме",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build",
+    "sidecar:dev": "python3 -m anilume_sidecar",
+    "sidecar:build": "python3 sidecar/build_sidecar.py",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-dialog": "^2.2.0",
+    "@tauri-apps/plugin-opener": "^2.2.5",
+    "@tauri-apps/plugin-os": "^2.2.0",
+    "hls.js": "^1.5.20",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}

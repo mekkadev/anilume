@@ -1,0 +1,35 @@
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Rust
+target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+
+# Bundled sidecar output
+sidecar/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config / secrets
+.env
+.env.local
