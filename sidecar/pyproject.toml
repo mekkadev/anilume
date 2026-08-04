@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anilume-sidecar"
+version = "0.1.0"
+description = "JSON-RPC мост между anicli-api и десктоп-приложением anilume"
+requires-python = ">=3.10"
+dependencies = [
+    "anicli-api>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pyinstaller>=6.3",
+]
+
+[project.scripts]
+anilume-sidecar = "anilume_sidecar.server:main"
+
+[tool.setuptools.packages.find]
+include = ["anilume_sidecar*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
