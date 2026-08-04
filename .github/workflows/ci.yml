@@ -56,6 +56,9 @@ jobs:
       - name: Форматирование ядра
         run: cargo fmt -p anilume-core --check
 
+      - name: Проверка оформления
+        run: python scripts/design_lint.py --max-severity P1
+
       - name: Установить зависимости интерфейса
         run: npm ci
 

@@ -54,6 +54,8 @@ pub fn run() {
             commands::catalog_search,
             commands::catalog_search_multi,
             commands::anime_get,
+            commands::source_config_set,
+            commands::animelib_servers,
             commands::episode_studios,
             commands::studio_videos,
             commands::playback_open,

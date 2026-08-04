@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
-from . import __version__, dto
+from . import __version__, dto, settings
 from .handles import HandleRegistry
 from .protocol import (
     INVALID_PARAMS,
@@ -61,8 +61,28 @@ class AnilumeService:
             "defaultSource": DEFAULT_SOURCE,
         }
 
+    async def config_set(self, params: dict[str, Any]) -> dict[str, Any]:
+        section = str(_require(params, "section"))
+        values = params.get("values")
+        if not isinstance(values, dict):
+            raise RpcError(INVALID_PARAMS, "Параметр «values» должен быть объектом")
+
+        merged = {**settings.section(section), **values}
+        settings.set_section(section, merged)
+        self.pool.reset(section)
+        return {"section": section, "keys": sorted(merged)}
+
     async def sources_list(self, _: dict[str, Any]) -> dict[str, Any]:
         return {"sources": [s.to_json() for s in SOURCES], "default": DEFAULT_SOURCE}
+
+    async def animelib_servers(self, _: dict[str, Any]) -> dict[str, Any]:
+        extractor = self.pool.get("animelib")
+        servers = await _call("animelib", "servers", extractor._client.servers())
+        return {
+            "servers": [{"id": key, "url": url} for key, url in servers.items()],
+            "selected": settings.get("animelib", "server") or "main",
+            "hasToken": bool(settings.get("animelib", "token")),
+        }
 
     async def catalog_ongoing(self, params: dict[str, Any]) -> dict[str, Any]:
         source_key = params.get("source") or DEFAULT_SOURCE
@@ -161,6 +181,8 @@ class AnilumeService:
         return {
             "ping": self.ping,
             "sources.list": self.sources_list,
+            "config.set": self.config_set,
+            "animelib.servers": self.animelib_servers,
             "catalog.ongoing": self.catalog_ongoing,
             "catalog.search": self.catalog_search,
             "catalog.searchMulti": self.catalog_search_multi,

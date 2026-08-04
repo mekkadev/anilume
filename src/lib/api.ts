@@ -64,6 +64,16 @@ export const api = {
 
   anime: (handle: string) => call<AnimeDetail>("anime_get", { handle }),
 
+  sourceConfigSet: (section: string, values: Record<string, unknown>) =>
+    call<{ section: string; keys: string[] }>("source_config_set", { section, values }),
+
+  animelibServers: () =>
+    call<{
+      servers: { id: string; url: string }[];
+      selected: string;
+      hasToken: boolean;
+    }>("animelib_servers"),
+
   studios: (handle: string) =>
     call<{ studios: StudioInfo[] }>("episode_studios", { handle }),
 

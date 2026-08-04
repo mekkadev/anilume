@@ -61,10 +61,11 @@ the rust core is a separate crate from the tauri shell on purpose: the shell nee
 
 ## sources
 
-nine catalogues, whatever anicli-api supports. the picker lives in the sidebar and the choice sticks.
+ten catalogues. nine come from anicli-api; animelib is talked to directly. the picker lives in the sidebar and the choice sticks.
 
 | source | note |
 | --- | --- |
+| animelib | ten-plus dub teams per episode, full-size covers, and its own player up to 2160p — the 4k tier needs your account token, see below. the default |
 | anilibria | works without a vpn, own dub, official rest api — the default |
 | animego | biggest catalogue, most dubs, kodik and aniboom — needs a cis ip |
 | yummy anime | rich metadata, and the only one that hands over a `shikimori_id` |
@@ -74,6 +75,19 @@ nine catalogues, whatever anicli-api supports. the picker lives in the sidebar a
 search runs against one source by default and against all nine on request, concurrently. a source that fails does not take the page down with it — it comes back in a separate list, and geo-blocked ones say so instead of showing a generic error.
 
 anicli-api objects are a stateful chain: episodes come off a live `Anime` object, which comes off a live `Search` object, and none of it is addressable by id. so the python sidecar keeps those objects in an lru and hands out string handles. when a handle is evicted you get `-32001` and the app quietly re-resolves the title by search. that is also why watch history and library store the source url rather than a handle — it is the only identifier that survives a restart.
+
+## the animelib token
+
+animelib answers anonymously with kodik links only. with your account token the same
+episode also returns animelib's own player — direct mp4, up to 2160p, no iframe.
+
+the token lives in your browser on v5.animelib.org: devtools, network tab, any request
+to hapi.hentaicdn.org, the `Authorization` header minus the word `Bearer`. paste it into
+settings. it is stored in the local sqlite database on your machine and sent to
+animelib and nowhere else. the app works without it.
+
+three cdn servers are published; they do not all answer at any given moment, so the
+server picker sits in settings next to the token.
 
 ## shikimori
 

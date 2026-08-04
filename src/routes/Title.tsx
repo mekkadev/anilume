@@ -394,6 +394,14 @@ export function Title(props: { card: AnimeCard }) {
                     <div class="hero__genres">{info().meta.genres.join(" · ")}</div>
                   </Show>
 
+                  <Show when={info().meta.tags.length > 0}>
+                    <div class="hero__tags">
+                      <For each={info().meta.tags.slice(0, 8)}>
+                        {(tag) => <span class="tag">{tag}</span>}
+                      </For>
+                    </div>
+                  </Show>
+
                   <Show when={info().description}>
                     <p class="hero__description" data-expanded={expanded()}>
                       {info().description}

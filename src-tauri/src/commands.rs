@@ -68,6 +68,23 @@ pub async fn catalog_search_multi(
 }
 
 #[tauri::command]
+pub async fn source_config_set(
+    state: State<'_, AppState>,
+    section: String,
+    values: Value,
+) -> Answer<Value> {
+    Ok(state
+        .sidecar
+        .call("config.set", json!({ "section": section, "values": values }))
+        .await?)
+}
+
+#[tauri::command]
+pub async fn animelib_servers(state: State<'_, AppState>) -> Answer<Value> {
+    Ok(state.sidecar.call("animelib.servers", json!({})).await?)
+}
+
+#[tauri::command]
 pub async fn anime_get(state: State<'_, AppState>, handle: String) -> Answer<Value> {
     Ok(state
         .sidecar

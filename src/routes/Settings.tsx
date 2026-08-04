@@ -5,10 +5,45 @@ import { api } from "../lib/api";
 import { activeSource, pushToast, reportError, setActiveSource, sources } from "../lib/store";
 
 const OOB = "urn:ietf:wg:oauth:2.0:oob";
+const SERVER_LABELS: Record<string, string> = {
+  main: "Основной",
+  secondary_1: "Резервный 1",
+  secondary_2: "Резервный 2",
+};
 const LOOPBACK = "http://127.0.0.1:53682/";
 
 export function Settings() {
   const [status, { refetch }] = createResource(() => api.shikimoriStatus());
+  const [animelib, { refetch: refetchAnimelib }] = createResource(() =>
+    api.animelibServers(),
+  );
+  const [libToken, setLibToken] = createSignal("");
+  const [savingLib, setSavingLib] = createSignal(false);
+
+  const saveAnimelibToken = async () => {
+    setSavingLib(true);
+    try {
+      await api.sourceConfigSet("animelib", { token: libToken().trim() });
+      await api.settingSet("animelib.token", libToken().trim());
+      setLibToken("");
+      await refetchAnimelib();
+      pushToast("Токен сохранён — свой плеер AnimeLib доступен", "success");
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setSavingLib(false);
+    }
+  };
+
+  const chooseServer = async (id: string) => {
+    try {
+      await api.sourceConfigSet("animelib", { server: id });
+      await api.settingSet("animelib.server", id);
+      await refetchAnimelib();
+    } catch (error) {
+      reportError(error);
+    }
+  };
 
   const [clientId, setClientId] = createSignal("");
   const [clientSecret, setClientSecret] = createSignal("");
@@ -126,6 +161,59 @@ export function Settings() {
             )}
           </For>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel__title">AnimeLib</h2>
+        <p class="panel__hint">
+          Без токена AnimeLib отдаёт только ссылки на Kodik. С токеном открывается его
+          собственный плеер — прямые mp4 вплоть до 2160p. Токен лежит в браузере на
+          v5.animelib.org: инструменты разработчика, вкладка «Сеть», любой запрос к
+          hapi.hentaicdn.org, заголовок Authorization без слова Bearer. Он хранится
+          только на этом компьютере.
+        </p>
+
+        <div class="field-inline">
+          <label class="field">
+            <span>Токен доступа</span>
+            <input
+              type="password"
+              value={libToken()}
+              onInput={(event) => setLibToken(event.currentTarget.value)}
+              placeholder={animelib()?.hasToken ? "Токен сохранён — введите новый, чтобы заменить" : "eyJ0eXAiOiJKV1Qi…"}
+              spellcheck={false}
+              autocomplete="off"
+            />
+          </label>
+          <button
+            class="btn btn--primary"
+            onClick={() => void saveAnimelibToken()}
+            disabled={savingLib() || libToken().trim().length === 0}
+          >
+            Сохранить
+          </button>
+        </div>
+
+        <Show when={(animelib()?.servers ?? []).length > 0}>
+          <div class="panel__row">
+            <span class="panel__rowlabel">Сервер видео</span>
+            <div class="segment">
+              <For each={animelib()!.servers}>
+                {(server) => (
+                  <button
+                    data-active={animelib()?.selected === server.id}
+                    onClick={() => void chooseServer(server.id)}
+                  >
+                    {SERVER_LABELS[server.id] ?? server.id}
+                  </button>
+                )}
+              </For>
+            </div>
+          </div>
+          <p class="panel__hint">
+            Если серия не открывается, переключите сервер — резервные бывают недоступны.
+          </p>
+        </Show>
       </section>
 
       <section class="panel">

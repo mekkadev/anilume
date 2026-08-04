@@ -17,6 +17,7 @@ export interface AnimeMeta {
   altTitle: string | null;
   shikimoriId: number | null;
   episodeDurationMin: number | null;
+  tags: string[];
 }
 
 export interface AnimeCard {

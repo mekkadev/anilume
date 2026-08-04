@@ -110,6 +110,8 @@ async def test_dispatch_table_covers_documented_methods(service):
     assert set(service.dispatch_table()) == {
         "ping",
         "sources.list",
+        "config.set",
+        "animelib.servers",
         "catalog.ongoing",
         "catalog.search",
         "catalog.searchMulti",
@@ -118,3 +120,24 @@ async def test_dispatch_table_covers_documented_methods(service):
         "episode.studios",
         "studio.videos",
     }
+
+
+async def test_config_set_merges_and_resets_extractor(service, wire):
+    marker = FakeExtractor()
+    wire("animelib", marker)
+
+    first = await service.config_set({"section": "animelib", "values": {"token": "abc"}})
+    assert first["keys"] == ["token"]
+
+    second = await service.config_set({"section": "animelib", "values": {"server": "main"}})
+    assert second["keys"] == ["server", "token"]
+
+    from anilume_sidecar import settings
+
+    assert settings.get("animelib", "token") == "abc"
+    assert service.pool._cache.get("animelib") is not marker
+
+async def test_config_set_requires_object(service):
+    with pytest.raises(RpcError) as exc:
+        await service.config_set({"section": "animelib", "values": "не объект"})
+    assert exc.value.code == INVALID_PARAMS
