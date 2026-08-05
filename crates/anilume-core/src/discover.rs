@@ -645,7 +645,7 @@ impl Discover {
                     .unwrap_or(genre.name),
             })
             .collect();
-        genres.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        genres.sort_by_key(|genre| genre.name.to_lowercase());
 
         let mut studios: Vec<Named> = studios
             .into_iter()
@@ -658,7 +658,7 @@ impl Discover {
             })
             .filter(|studio| !studio.name.trim().is_empty())
             .collect();
-        studios.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        studios.sort_by_key(|studio| studio.name.to_lowercase());
 
         let options = DiscoverOptions { genres, studios };
         *self.options.lock().await = Some(options.clone());
