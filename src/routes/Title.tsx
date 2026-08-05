@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 
 import { Icon } from "../components/Icon";
+import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
@@ -26,9 +27,19 @@ import {
   setQualityPref,
   setRememberDub,
 } from "../lib/prefs";
-import { openPlayer, pushToast, reportError, sourceName } from "../lib/store";
+import { resolveCard } from "../lib/resolve";
+import {
+  activeSource,
+  navigate,
+  openPlayer,
+  pushToast,
+  reportError,
+  setAmbient,
+  sourceName,
+} from "../lib/store";
 import type {
   AnimeCard,
+  DiscoverCard,
   VideoInfo,
   AnimeDetail,
   EpisodeInfo,
@@ -65,6 +76,56 @@ export function Title(props: { card: AnimeCard }) {
     () => [props.card.source, props.card.key] as const,
     ([source, key]) => api.libraryGet(source, key),
   );
+
+  const [shiki] = createResource(
+    () => detail(),
+    async (info) => {
+      const known = info.meta.shikimoriId ?? info.meta.malId;
+      const id =
+        known ??
+        (await api.discoverMatch(info.title, info.meta.year ?? undefined))?.id ??
+        null;
+      return id ? await api.discoverTitle(id) : null;
+    },
+  );
+
+  const [related] = createResource(
+    () => shiki()?.id ?? null,
+    (id) => api.discoverRelated(id),
+  );
+
+  const [similar] = createResource(
+    () => shiki()?.id ?? null,
+    (id) => api.discoverSimilar(id, 16),
+  );
+
+  const [comments] = createResource(
+    () => shiki()?.topicId ?? null,
+    (topicId) => api.discoverComments(topicId, 15),
+  );
+
+  createEffect(() => setAmbient(shiki()?.art[0] ?? detail()?.poster ?? null));
+  onCleanup(() => setAmbient(null));
+
+  const [opening, setOpening] = createSignal<number | null>(null);
+
+  const openShiki = async (card: DiscoverCard) => {
+    setOpening(card.id);
+    try {
+      navigate({
+        name: "title",
+        card: await resolveCard(activeSource(), "", card.title),
+      });
+    } catch {
+      pushToast(
+        `«${card.title}» не нашлось в источнике ${sourceName(activeSource())}`,
+        "error",
+        "Выберите другой источник внизу боковой панели",
+      );
+    } finally {
+      setOpening(null);
+    }
+  };
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [busyEpisode, setBusyEpisode] = createSignal<number | null>(null);
@@ -370,74 +431,106 @@ export function Title(props: { card: AnimeCard }) {
       <Show when={detail()} fallback={<TitleSkeleton />}>
         {(info) => (
           <>
-            <section class="hero">
-              <div class="hero__glow">
-                <Show when={info().poster}>
-                  <div
-                    class="hero__backdrop"
-                    style={{ "background-image": `url(${info().poster})` }}
-                  />
+            <section class="title-hero">
+              <div class="title-hero__art">
+                <Show when={shiki()?.art[0]}>
+                  <img src={shiki()!.art[0]} alt="" decoding="async" />
                 </Show>
               </div>
+              <div class="title-hero__fade" />
 
-              <div class="hero__inner">
-                <div class="hero__poster">
+              <div class="title-hero__grid">
+                <div class="title-poster">
                   <Show when={info().poster} fallback={<div class="skeleton" />}>
                     <img src={info().poster!} alt={info().title} decoding="async" />
                   </Show>
                 </div>
 
-                <div class="hero__body">
-                  <h1 class="hero__title">{info().title}</h1>
-                  <Show when={info().meta.altTitle}>
-                    <div class="hero__alt">{info().meta.altTitle}</div>
-                  </Show>
-
-                  <div class="hero__chips">
-                    <Show when={info().meta.score}>
-                      <span class="chip chip--warning">
-                        <Icon name="star" size={11} />
-                        {info().meta.score!.toFixed(1)}
-                      </span>
+                <div class="title-info">
+                  <div>
+                    <h1 class="title-info__name">{info().title}</h1>
+                    <Show when={shiki()?.japanese ?? info().meta.altTitle}>
+                      <div class="title-info__alt">
+                        {shiki()?.japanese ?? info().meta.altTitle}
+                      </div>
                     </Show>
-                    <Show when={info().meta.year}>
-                      <span class="chip">{info().meta.year}</span>
-                    </Show>
-                    <Show when={info().meta.kind}>
-                      <span class="chip">{info().meta.kind}</span>
-                    </Show>
-                    <Show when={info().meta.status}>
-                      <span class="chip chip--accent">{info().meta.status}</span>
-                    </Show>
-                    <Show when={info().meta.ageRating}>
-                      <span class="chip">{info().meta.ageRating}</span>
-                    </Show>
-                    <span class="chip">{episodesLabel(info().episodes.length)}</span>
-                    <span class="chip">{sourceName(props.card.source)}</span>
                   </div>
 
-                  <Show when={(info().meta.genres ?? []).length > 0}>
-                    <div class="hero__genres">{(info().meta.genres ?? []).join(" · ")}</div>
-                  </Show>
+                  <div class="title-info__row">
+                    <Show when={shiki()?.score ?? info().meta.score}>
+                      {(value) => (
+                        <div class="score-block">
+                          <span class="score-block__label">Оценка</span>
+                          <Score value={value()} />
+                        </div>
+                      )}
+                    </Show>
 
-                  <Show when={(info().meta.tags ?? []).length > 0}>
-                    <div class="hero__tags">
-                      <For each={(info().meta.tags ?? []).slice(0, 8)}>
-                        {(tag) => <span class="tag">{tag}</span>}
+                    <div class="facts">
+                      <Show when={(shiki()?.studios ?? []).length > 0}>
+                        <div>
+                          <div class="fact__label">Студия</div>
+                          <div class="fact__value">
+                            {shiki()!.studios.map((studio) => studio.name).join(", ")}
+                          </div>
+                        </div>
+                      </Show>
+                      <div>
+                        <div class="fact__label">Серии</div>
+                        <div class="fact__value">
+                          {episodesLabel(info().episodes.length)}
+                        </div>
+                      </div>
+                      <Show when={shiki()?.duration}>
+                        <div>
+                          <div class="fact__label">Серия идёт</div>
+                          <div class="fact__value">{shiki()!.duration} мин.</div>
+                        </div>
+                      </Show>
+                      <Show when={info().meta.year}>
+                        <div>
+                          <div class="fact__label">Год</div>
+                          <div class="fact__value">{info().meta.year}</div>
+                        </div>
+                      </Show>
+                      <Show when={info().meta.status}>
+                        <div>
+                          <div class="fact__label">Статус</div>
+                          <div class="fact__value">{info().meta.status}</div>
+                        </div>
+                      </Show>
+                      <div>
+                        <div class="fact__label">Источник</div>
+                        <div class="fact__value">{sourceName(props.card.source)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Show
+                    when={(shiki()?.genres ?? info().meta.genres ?? []).length > 0}
+                  >
+                    <div class="title-info__row">
+                      <For each={shiki()?.genres ?? info().meta.genres ?? []}>
+                        {(genre) => <span class="chip">{genre}</span>}
                       </For>
+                      <Show when={info().meta.ageRating}>
+                        <span class="chip">{info().meta.ageRating}</span>
+                      </Show>
                     </div>
                   </Show>
 
-                  <Show when={info().description}>
-                    <p class="hero__description" data-expanded={expanded()}>
-                      {info().description}
-                    </p>
-                    <button class="link-btn" onClick={() => setExpanded(!expanded())}>
-                      {expanded() ? "Свернуть" : "Читать полностью"}
-                    </button>
+                  <Show when={shiki()?.description || info().description}>
+                    <div>
+                      <p class="title-info__text" data-clamped={!expanded()}>
+                        {shiki()?.description || info().description}
+                      </p>
+                      <button class="link-btn" onClick={() => setExpanded(!expanded())}>
+                        {expanded() ? "Свернуть" : "Читать полностью"}
+                      </button>
+                    </div>
                   </Show>
 
-                  <div class="hero__actions">
+                  <div class="title-info__row">
                     <Show when={nextEpisode()}>
                       {(episode) => (
                         <button
@@ -612,11 +705,107 @@ export function Title(props: { card: AnimeCard }) {
                 </For>
               </div>
             </section>
+
+            <Show when={(related() ?? []).length > 0}>
+              <section class="row">
+                <div class="row__head">
+                  <h2 class="section__title">Сезоны и связанное</h2>
+                  <span class="page-sub">по данным Shikimori</span>
+                </div>
+
+                <div class="row__track row__track--wide">
+                  <For each={related()}>
+                    {(entry) => (
+                      <button
+                        class="season-card"
+                        disabled={opening() === entry.card.id}
+                        onClick={() => void openShiki(entry.card)}
+                      >
+                        <div class="season-card__art">
+                          <Show when={entry.card.poster}>
+                            <img
+                              src={entry.card.poster!}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </Show>
+                          <span class="season-card__relation">{entry.relation}</span>
+                        </div>
+                        <div class="season-card__title">{entry.card.title}</div>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
+
+            <Show when={(similar() ?? []).length > 0}>
+              <section class="row">
+                <div class="row__head">
+                  <h2 class="section__title">Похожее</h2>
+                </div>
+
+                <div class="row__track">
+                  <For each={similar()}>
+                    {(card) => (
+                      <ShikiCard
+                        card={card}
+                        busy={opening() === card.id}
+                        onOpen={(chosen) => void openShiki(chosen)}
+                      />
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
+
+            <Show when={(comments() ?? []).length > 0}>
+              <section class="section">
+                <div class="section__head">
+                  <h2 class="section__title">Комментарии</h2>
+                  <span class="page-sub">обсуждение на Shikimori</span>
+                </div>
+
+                <div class="comments">
+                  <For each={comments()}>
+                    {(comment) => (
+                      <article class="comment">
+                        <div class="comment__avatar">
+                          <Show when={comment.avatar}>
+                            <img src={comment.avatar!} alt="" loading="lazy" />
+                          </Show>
+                        </div>
+                        <div>
+                          <div class="comment__head">
+                            <span class="comment__who">{comment.author}</span>
+                            <span class="comment__when">
+                              {commentDate(comment.createdAt)}
+                            </span>
+                          </div>
+                          <div class="comment__body">{comment.body}</div>
+                        </div>
+                      </article>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
           </>
         )}
       </Show>
     </div>
   );
+}
+
+function commentDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function ViewSettings() {
@@ -716,10 +905,10 @@ function LibraryMenu(props: {
 
 function TitleSkeleton() {
   return (
-    <div class="hero">
-      <div class="hero__inner">
-        <div class="hero__poster skeleton" />
-        <div class="hero__body">
+    <div class="title-hero">
+      <div class="title-hero__grid">
+        <div class="title-poster skeleton" />
+        <div class="title-info">
           <div class="skeleton" style={{ height: "30px", width: "58%", "border-radius": "7px" }} />
           <div class="skeleton" style={{ height: "14px", width: "34%", "border-radius": "5px", "margin-top": "12px" }} />
           <div class="skeleton" style={{ height: "64px", width: "100%", "border-radius": "9px", "margin-top": "20px" }} />

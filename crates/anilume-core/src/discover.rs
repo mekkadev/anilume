@@ -164,6 +164,47 @@ pub struct DiscoverOptions {
     pub studios: Vec<Named>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TitleDetail {
+    pub id: i64,
+    pub title: String,
+    pub original_title: String,
+    pub japanese: Option<String>,
+    pub poster: Option<String>,
+    pub art: Vec<String>,
+    pub description: String,
+    pub score: Option<f64>,
+    pub kind: Option<String>,
+    pub status: Option<String>,
+    pub year: Option<i64>,
+    pub episodes: Option<i64>,
+    pub episodes_aired: Option<i64>,
+    pub duration: Option<i64>,
+    pub rating: Option<String>,
+    pub genres: Vec<String>,
+    pub studios: Vec<Named>,
+    pub next_episode_at: Option<String>,
+    pub topic_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RelatedTitle {
+    pub relation: String,
+    pub card: DiscoverCard,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Comment {
+    pub id: i64,
+    pub author: String,
+    pub avatar: Option<String>,
+    pub body: String,
+    pub created_at: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawImage {
     #[serde(default)]
@@ -184,7 +225,7 @@ struct RawAnime {
     #[serde(default)]
     kind: Option<String>,
     #[serde(default)]
-    score: Option<String>,
+    score: Option<serde_json::Value>,
     #[serde(default)]
     status: Option<String>,
     #[serde(default)]
@@ -193,6 +234,67 @@ struct RawAnime {
     episodes_aired: Option<i64>,
     #[serde(default)]
     aired_on: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawScreenshot {
+    #[serde(default)]
+    original: Option<String>,
+    #[serde(default)]
+    preview: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawDetail {
+    #[serde(flatten)]
+    base: RawAnime,
+    #[serde(default)]
+    japanese: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    duration: Option<i64>,
+    #[serde(default)]
+    rating: Option<String>,
+    #[serde(default)]
+    genres: Vec<RawGenre>,
+    #[serde(default)]
+    studios: Vec<RawStudio>,
+    #[serde(default)]
+    screenshots: Vec<RawScreenshot>,
+    #[serde(default)]
+    next_episode_at: Option<String>,
+    #[serde(default)]
+    topic_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawRelated {
+    #[serde(default)]
+    relation_russian: Option<String>,
+    #[serde(default)]
+    relation: Option<String>,
+    #[serde(default)]
+    anime: Option<RawAnime>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawUser {
+    #[serde(default)]
+    nickname: String,
+    #[serde(default)]
+    avatar: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawComment {
+    id: i64,
+    #[serde(default)]
+    body: String,
+    #[serde(default)]
+    created_at: String,
+    #[serde(default)]
+    user: Option<RawUser>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -236,6 +338,76 @@ fn absolute(path: &str) -> String {
     }
 }
 
+fn parse_score(value: Option<&serde_json::Value>) -> Option<f64> {
+    let parsed = match value {
+        Some(serde_json::Value::String(text)) => text.parse::<f64>().ok(),
+        Some(serde_json::Value::Number(number)) => number.as_f64(),
+        _ => None,
+    };
+    parsed.filter(|score| *score > 0.0)
+}
+
+fn drop_blocks(input: &str, tag: &str) -> String {
+    let open = format!("[{tag}");
+    let close = format!("[/{tag}]");
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+
+    while let Some(start) = rest.find(&open) {
+        out.push_str(&rest[..start]);
+        match rest[start..].find(&close) {
+            Some(end) => rest = &rest[start + end + close.len()..],
+            None => return out,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+pub fn strip_bbcode(input: &str) -> String {
+    let source = drop_blocks(input, "spoiler");
+    let mut out = String::with_capacity(source.len());
+    let mut rest = source.as_str();
+
+    while let Some(start) = rest.find('[') {
+        out.push_str(&rest[..start]);
+        let Some(end) = rest[start..].find(']') else {
+            rest = &rest[start + 1..];
+            continue;
+        };
+
+        let tag = &rest[start + 1..start + end];
+        if tag.eq_ignore_ascii_case("br") {
+            out.push('\n');
+        }
+        rest = &rest[start + end + 1..];
+    }
+    out.push_str(rest);
+
+    let collapsed = out
+        .replace("\r\n", "\n")
+        .split('\n')
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut text = collapsed.trim().to_owned();
+    while text.contains("\n\n\n") {
+        text = text.replace("\n\n\n", "\n\n");
+    }
+    text
+}
+
+fn named_studio(studio: RawStudio) -> Named {
+    Named {
+        id: studio.id,
+        name: studio
+            .filtered_name
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(studio.name),
+    }
+}
+
 fn card_from_raw(raw: RawAnime) -> DiscoverCard {
     let poster = raw.image.and_then(|image| {
         image
@@ -258,11 +430,7 @@ fn card_from_raw(raw: RawAnime) -> DiscoverCard {
         title,
         original_title: raw.name,
         poster,
-        score: raw
-            .score
-            .as_deref()
-            .and_then(|value| value.parse::<f64>().ok())
-            .filter(|value| *value > 0.0),
+        score: parse_score(raw.score.as_ref()),
         kind: raw.kind,
         status: raw.status,
         year: raw
@@ -274,6 +442,78 @@ fn card_from_raw(raw: RawAnime) -> DiscoverCard {
             .episodes_aired
             .filter(|count| *count > 0)),
     }
+}
+
+fn detail_from_raw(raw: RawDetail) -> TitleDetail {
+    let art: Vec<String> = raw
+        .screenshots
+        .into_iter()
+        .filter_map(|shot| shot.original.or(shot.preview))
+        .filter(|path| !path.is_empty())
+        .map(|path| absolute(&path))
+        .take(8)
+        .collect();
+
+    let genres = raw
+        .genres
+        .into_iter()
+        .map(|genre| {
+            genre
+                .russian
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(genre.name)
+        })
+        .collect();
+
+    let duration = raw.duration.filter(|value| *value > 0);
+    let episodes_aired = raw.base.episodes_aired.filter(|value| *value > 0);
+    let card = card_from_raw(raw.base);
+
+    TitleDetail {
+        id: card.id,
+        title: card.title,
+        original_title: card.original_title,
+        japanese: raw.japanese.filter(|value| !value.trim().is_empty()),
+        poster: card.poster,
+        art,
+        description: raw.description.as_deref().map(strip_bbcode).unwrap_or_default(),
+        score: card.score,
+        kind: card.kind,
+        status: card.status,
+        year: card.year,
+        episodes: card.episodes,
+        episodes_aired,
+        duration,
+        rating: raw
+            .rating
+            .filter(|value| !value.is_empty() && value != "none"),
+        genres,
+        studios: raw.studios.into_iter().map(named_studio).collect(),
+        next_episode_at: raw.next_episode_at,
+        topic_id: raw.topic_id,
+    }
+}
+
+fn best_match(name: &str, year: Option<i64>, cards: Vec<DiscoverCard>) -> Option<DiscoverCard> {
+    let needle = name.trim().to_lowercase();
+    let same_name = |card: &DiscoverCard| {
+        card.title.to_lowercase() == needle || card.original_title.to_lowercase() == needle
+    };
+
+    if let Some(year) = year {
+        if let Some(found) = cards
+            .iter()
+            .find(|card| same_name(card) && card.year.is_some_and(|value| (value - year).abs() <= 1))
+        {
+            return Some(found.clone());
+        }
+    }
+
+    cards
+        .iter()
+        .find(|card| same_name(card))
+        .cloned()
+        .or_else(|| cards.into_iter().next())
 }
 
 pub struct Discover {
@@ -335,6 +575,84 @@ impl Discover {
         let options = DiscoverOptions { genres, studios };
         *self.options.lock().await = Some(options.clone());
         Ok(options)
+    }
+
+    pub async fn title(&self, id: i64) -> Result<TitleDetail> {
+        let raw: RawDetail = self.fetch(&format!("/api/animes/{id}"), &[]).await?;
+        Ok(detail_from_raw(raw))
+    }
+
+    pub async fn similar(&self, id: i64, limit: usize) -> Result<Vec<DiscoverCard>> {
+        let raw: Vec<RawAnime> = self.fetch(&format!("/api/animes/{id}/similar"), &[]).await?;
+        Ok(raw.into_iter().take(limit).map(card_from_raw).collect())
+    }
+
+    pub async fn related(&self, id: i64) -> Result<Vec<RelatedTitle>> {
+        let raw: Vec<RawRelated> = self.fetch(&format!("/api/animes/{id}/related"), &[]).await?;
+        Ok(raw
+            .into_iter()
+            .filter_map(|entry| {
+                let anime = entry.anime?;
+                let relation = entry
+                    .relation_russian
+                    .or(entry.relation)
+                    .unwrap_or_else(|| "Связано".to_owned());
+                Some(RelatedTitle {
+                    relation,
+                    card: card_from_raw(anime),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn comments(&self, topic_id: i64, limit: i64) -> Result<Vec<Comment>> {
+        let params = [
+            ("commentable_id".to_owned(), topic_id.to_string()),
+            ("commentable_type".to_owned(), "Topic".to_owned()),
+            ("limit".to_owned(), limit.clamp(1, 30).to_string()),
+            ("desc".to_owned(), "1".to_owned()),
+        ];
+
+        let raw: Vec<RawComment> = self.fetch("/api/comments", &params).await?;
+        Ok(raw
+            .into_iter()
+            .filter_map(|entry| {
+                let body = strip_bbcode(&entry.body);
+                if body.is_empty() {
+                    return None;
+                }
+                let user = entry.user.unwrap_or(RawUser {
+                    nickname: String::new(),
+                    avatar: None,
+                });
+                Some(Comment {
+                    id: entry.id,
+                    author: if user.nickname.is_empty() {
+                        "Аноним".to_owned()
+                    } else {
+                        user.nickname
+                    },
+                    avatar: user.avatar.filter(|value| !value.is_empty()),
+                    body,
+                    created_at: entry.created_at,
+                })
+            })
+            .collect())
+    }
+
+    pub async fn match_title(&self, name: &str, year: Option<i64>) -> Result<Option<DiscoverCard>> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Ok(None);
+        }
+
+        let params = [
+            ("search".to_owned(), trimmed.to_owned()),
+            ("limit".to_owned(), "10".to_owned()),
+        ];
+        let raw: Vec<RawAnime> = self.fetch("/api/animes", &params).await?;
+        let cards: Vec<DiscoverCard> = raw.into_iter().map(card_from_raw).collect();
+        Ok(best_match(trimmed, year, cards))
     }
 
     async fn fetch<T: serde::de::DeserializeOwned>(
@@ -516,6 +834,125 @@ mod tests {
         assert_eq!(card.score, None);
         assert_eq!(card.year, None);
         assert_eq!(card.episodes, Some(12));
+    }
+
+    #[test]
+    fn bbcode_markup_is_reduced_to_plain_text() {
+        let source = "Король пиратов, [character=4883]Роджер[/character], был [b]единственным[/b].[br]\
+                      [url=https://x]Ссылка[/url] в конце.";
+        assert_eq!(
+            strip_bbcode(source),
+            "Король пиратов, Роджер, был единственным.\nСсылка в конце."
+        );
+    }
+
+    #[test]
+    fn spoiler_blocks_are_dropped_along_with_their_text() {
+        let source = "Начало. [spoiler=Важно]он умирает[/spoiler] Конец.";
+        let stripped = strip_bbcode(source);
+        assert!(!stripped.contains("умирает"));
+        assert!(stripped.starts_with("Начало."));
+        assert!(stripped.ends_with("Конец."));
+    }
+
+    #[test]
+    fn an_unclosed_bracket_does_not_swallow_the_description() {
+        assert_eq!(strip_bbcode("Текст [b без закрытия"), "Текст b без закрытия");
+    }
+
+    #[test]
+    fn score_is_read_from_a_string_or_a_number() {
+        assert_eq!(parse_score(Some(&serde_json::json!("8.61"))), Some(8.61));
+        assert_eq!(parse_score(Some(&serde_json::json!(7.5))), Some(7.5));
+        assert_eq!(parse_score(Some(&serde_json::json!("0.0"))), None);
+        assert_eq!(parse_score(None), None);
+    }
+
+    #[test]
+    fn details_carry_studios_art_and_a_clean_description() {
+        let raw: RawDetail = serde_json::from_str(
+            r#"{"id":21,"name":"One Piece","russian":"Ван-Пис","japanese":"ワンピース",
+                "image":{"original":"/system/animes/original/21.jpg"},
+                "description":"Пираты [b]здесь[/b].","duration":24,"rating":"pg_13",
+                "score":"8.72","kind":"tv","status":"ongoing","aired_on":"1999-10-20",
+                "episodes":0,"episodes_aired":1150,
+                "genres":[{"id":1,"name":"Action","russian":"Экшен"}],
+                "studios":[{"id":18,"name":"Toei Animation","filtered_name":"Toei"}],
+                "screenshots":[{"original":"/system/screenshots/original/a.jpg","preview":"/p.jpg"}],
+                "topic_id":3413}"#,
+        )
+        .unwrap();
+
+        let detail = detail_from_raw(raw);
+        assert_eq!(detail.title, "Ван-Пис");
+        assert_eq!(detail.japanese.as_deref(), Some("ワンピース"));
+        assert_eq!(detail.description, "Пираты здесь.");
+        assert_eq!(detail.genres, vec!["Экшен"]);
+        assert_eq!(detail.studios, vec![Named { id: 18, name: "Toei".into() }]);
+        assert_eq!(
+            detail.art,
+            vec![format!("{CATALOG_BASE}/system/screenshots/original/a.jpg")]
+        );
+        assert_eq!(detail.episodes, Some(1150));
+        assert_eq!(detail.episodes_aired, Some(1150));
+        assert_eq!(detail.duration, Some(24));
+        assert_eq!(detail.topic_id, Some(3413));
+    }
+
+    #[test]
+    fn a_rating_of_none_is_treated_as_absent() {
+        let raw: RawDetail =
+            serde_json::from_str(r#"{"id":1,"name":"A","rating":"none","duration":0}"#).unwrap();
+        let detail = detail_from_raw(raw);
+        assert_eq!(detail.rating, None);
+        assert_eq!(detail.duration, None);
+    }
+
+    fn card(id: i64, title: &str, original: &str, year: Option<i64>) -> DiscoverCard {
+        DiscoverCard {
+            id,
+            title: title.into(),
+            original_title: original.into(),
+            poster: None,
+            score: None,
+            kind: None,
+            status: None,
+            year,
+            episodes: None,
+        }
+    }
+
+    #[test]
+    fn matching_prefers_an_exact_name_over_the_first_result() {
+        let found = best_match(
+            "Дороро",
+            None,
+            vec![
+                card(1, "Дороро и Хяккимару", "Dororo to Hyakkimaru", Some(1969)),
+                card(2, "Дороро", "Dororo", Some(2019)),
+            ],
+        );
+        assert_eq!(found.unwrap().id, 2);
+    }
+
+    #[test]
+    fn matching_uses_the_year_to_separate_titles_that_share_a_name() {
+        let found = best_match(
+            "Дороро",
+            Some(2019),
+            vec![
+                card(1, "Дороро", "Dororo", Some(1969)),
+                card(2, "Дороро", "Dororo", Some(2019)),
+            ],
+        );
+        assert_eq!(found.unwrap().id, 2);
+    }
+
+    #[test]
+    fn matching_falls_back_to_the_first_result_and_survives_an_empty_list() {
+        let found = best_match("что-то другое", None, vec![card(7, "Ван-Пис", "One Piece", None)]);
+        assert_eq!(found.unwrap().id, 7);
+        assert_eq!(best_match("что угодно", None, Vec::new()), None);
     }
 
     #[test]

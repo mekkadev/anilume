@@ -2,7 +2,7 @@
 
 a desktop anime client in russian, with its own player instead of someone else's iframe
 
-[install](#install) · [build it yourself](#build-it-yourself) · [why the player is ours](#why-the-player-is-ours) · [what the player does](#what-the-player-does) · [sources](#sources) · [the catalogue](#the-catalogue) · [shikimori](#shikimori) · [downloads](#downloads) · [limits](#limits) · [stack](#stack)
+[install](#install) · [build it yourself](#build-it-yourself) · [why the player is ours](#why-the-player-is-ours) · [what the player does](#what-the-player-does) · [the interface](#the-interface) · [sources](#sources) · [the catalogue](#the-catalogue) · [shikimori](#shikimori) · [downloads](#downloads) · [limits](#limits) · [stack](#stack)
 
 every russian anime site solves playback the same way: drop a kodik or alloha iframe on the page and let it own the experience. that is why they all feel identical, and why none of them can resume you at 14:32 of episode 7, remember which dub you picked, or hand you the file.
 
@@ -46,6 +46,29 @@ that also fixes the format list — mp4 everywhere, webm on both, mkv on neither
 no source serves mkv and downloads are remuxed to mp4, so this has not come up
 in practice, but it is a real limit rather than a missing feature.
 
+## the interface
+
+one window, no chrome. a floating glass rail on the left holds the six places you
+can be; everything else is content. behind it sits an ambient layer that takes the
+key art of whatever you are looking at, blurs it to 72px and desaturates it under
+a veil — the window is tinted by the thing on screen rather than by a theme.
+
+the home screen is a hero carousel over key art plus rows: популярное, новинки,
+сейчас выходит, лучшее, для вас. four of those come from shikimori; "сейчас
+выходит" comes from the source you picked, because that is the row you can
+actually press play on. "для вас" is anchored on the last thing you watched and
+says so in the header rather than pretending to be a model.
+
+the title page carries the poster, the score, the studio, the runtime, the genres,
+the episode list, the seasons and side-stories, what else is like it, and the
+shikimori discussion under it. bbcode is stripped to plain text on the rust side
+and spoiler blocks are dropped with their contents, so nothing renders as markup
+and nothing arrives as html.
+
+light and dark both work. the accent follows the system accent colour on macos.
+there are no emoji in the chrome — the section names in the design brief used
+them as shorthand; icons carry it instead.
+
 ## install
 
 grab a build from [releases](https://github.com/mekkadev/anilume/releases) — `.dmg` for apple silicon, `.msi` or `.exe` for windows x64.
@@ -74,7 +97,7 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 51, sidecar, no network
-cargo test -p anilume-core      # 69, includes a real proxy round-trip
+cargo test -p anilume-core      # 78, includes a real proxy round-trip
 npm run typecheck
 ```
 
@@ -82,7 +105,7 @@ the rust core is a separate crate from the tauri shell on purpose: the shell nee
 
 ## sources
 
-ten catalogues. nine come from anicli-api; animelib is talked to directly. the picker lives in the sidebar and the choice sticks.
+ten catalogues. nine come from anicli-api; animelib is talked to directly. the picker is the round button at the bottom of the rail and the choice sticks.
 
 | source | note |
 | --- | --- |
@@ -107,12 +130,17 @@ and nothing else.
 so the catalogue page asks [shikimori](https://shikimori.one) instead: 46 genres,
 1910 studios, a year range, airing status, type, and five sort orders, all from
 its public api with no account needed. picking a title then searches for it by
-name in whichever source is selected in the sidebar and opens it there.
+name in whichever source is selected in the rail and opens it there.
 
 that last step is the weak joint, and it is the same one history and the library
 already live with: names are matched, not ids. a title shikimori knows but the
 chosen source does not simply says so and suggests switching sources, which is
 honest but not the same as finding it.
+
+the same connection feeds the home rows, the studio and runtime on a title page,
+its seasons, what else is like it, and the discussion under it. a title opened
+from a source is matched back to shikimori by name and year when the source did
+not hand over an id.
 
 requests are paced to one every 240ms to stay inside shikimori's rate limit, and
 the genre and studio lists are fetched once per launch and kept in memory.
@@ -156,6 +184,7 @@ files land in `~/Videos/anilume/<title>/<title> - 03 серия [dub] [1080p].mp
 - **handles do not survive a restart.** the app re-resolves by title search, which is fast but can land on the wrong entry if a catalogue has near-duplicates.
 - **the download is large.** bundling ffmpeg is the whole reason: ~70 mb on macos, ~135 mb on windows. see [third-party licenses](./THIRD-PARTY.md) — the macos build is gpl, the windows one lgpl.
 - **the sidecar is python.** pyinstaller adds about 17 mb to the bundle. porting nine extractors to rust to avoid it was not worth doing twice.
+- **the home feed is not the source.** four of its five rows describe what exists, from shikimori; only one describes what the selected source can actually play. a row can therefore offer you something the source does not have, and it says so when you press it.
 - **neither build is signed.** see install.
 - **not a library.** it plays what public sources already serve; it hosts and decrypts nothing.
 

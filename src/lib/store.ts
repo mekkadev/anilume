@@ -15,23 +15,24 @@ export type Route =
   | { name: "settings" };
 
 const [route, setRoute] = createSignal<Route>({ name: "home" });
-const history: Route[] = [];
+const [stack, setStack] = createSignal<Route[]>([]);
 
 export { route };
 
 export function navigate(next: Route) {
-  history.push(route());
-  if (history.length > 50) history.shift();
+  setStack([...stack(), route()].slice(-50));
   setRoute(next);
 }
 
 export function goBack() {
-  const previous = history.pop();
+  const current = stack();
+  const previous = current[current.length - 1];
+  setStack(current.slice(0, -1));
   setRoute(previous ?? { name: "home" });
 }
 
 export function canGoBack() {
-  return history.length > 0;
+  return stack().length > 0;
 }
 
 export type RouteName = Route["name"];
@@ -66,6 +67,14 @@ export function setActiveSource(key: string) {
 
 export function sourceName(key: string) {
   return sources().find((s) => s.key === key)?.name ?? key;
+}
+
+const [ambient, setAmbientSignal] = createSignal<string | null>(null);
+
+export { ambient };
+
+export function setAmbient(url: string | null) {
+  setAmbientSignal(url);
 }
 
 export interface Toast {

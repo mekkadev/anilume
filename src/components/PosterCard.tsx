@@ -2,6 +2,7 @@ import { Show, createSignal } from "solid-js";
 
 import type { AnimeCard } from "../lib/types";
 import { Icon } from "./Icon";
+import { Score } from "./ShikiCard";
 
 interface PosterCardProps {
   card: AnimeCard;
@@ -46,9 +47,8 @@ export function PosterCard(props: PosterCardProps) {
         </Show>
 
         <Show when={props.card.meta.score}>
-          <span class="badge badge--score">
-            <Icon name="star" size={11} />
-            {props.card.meta.score!.toFixed(1)}
+          <span class="card__score">
+            <Score value={props.card.meta.score!} />
           </span>
         </Show>
 

@@ -1,5 +1,6 @@
-import { For, Index, Show, createResource, createSignal } from "solid-js";
+import { For, Index, Show, createResource, createSignal, onMount } from "solid-js";
 
+import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { api } from "../lib/api";
 import { activeSource, navigate, sourceName, sources } from "../lib/store";
@@ -7,10 +8,21 @@ import type { AnimeCard } from "../lib/types";
 
 export function Search(props: { query: string }) {
   const [everywhere, setEverywhere] = createSignal(false);
+  const [draft, setDraft] = createSignal(props.query);
+  let field: HTMLInputElement | undefined;
+
+  onMount(() => field?.focus());
+
+  const submit = (event: Event) => {
+    event.preventDefault();
+    const value = draft().trim();
+    if (value.length > 0) navigate({ name: "search", query: value });
+  };
 
   const [results] = createResource(
     () => [props.query, everywhere(), activeSource()] as const,
     async ([query, all, source]) => {
+      if (query.trim().length === 0) return { groups: [], failures: [] };
       if (!all) {
         const { items } = await api.search(source, query);
         return { groups: [{ source, items }], failures: [] };
@@ -34,10 +46,12 @@ export function Search(props: { query: string }) {
     <div class="fade-in">
       <div class="page-head">
         <div>
-          <h1 class="page-title">«{props.query}»</h1>
+          <h1 class="page-title">Поиск</h1>
           <p class="page-sub">
-            <Show when={!results.loading} fallback="Ищем…">
-              Найдено: {total()}
+            <Show when={props.query.trim().length > 0} fallback="По названию, в выбранном источнике или во всех сразу">
+              <Show when={!results.loading} fallback="Ищем…">
+                «{props.query}» — найдено: {total()}
+              </Show>
             </Show>
           </p>
         </div>
@@ -52,6 +66,21 @@ export function Search(props: { query: string }) {
         </div>
       </div>
 
+      <form class="search-field" onSubmit={submit}>
+        <Icon name="search" size={16} />
+        <input
+          ref={field}
+          type="search"
+          placeholder="Название аниме"
+          value={draft()}
+          onInput={(event) => setDraft(event.currentTarget.value)}
+          spellcheck={false}
+          autocomplete="off"
+        />
+        <span class="kbd">⌘K</span>
+      </form>
+
+      <Show when={props.query.trim().length > 0} fallback={<div class="empty" />}>
       <Show
         when={!results.loading}
         fallback={
@@ -104,6 +133,7 @@ export function Search(props: { query: string }) {
             </For>
           </div>
         </Show>
+      </Show>
       </Show>
     </div>
   );

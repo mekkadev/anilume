@@ -219,3 +219,38 @@ export interface AppError {
   message: string;
   hint?: string;
 }
+
+export interface TitleDetail {
+  id: number;
+  title: string;
+  originalTitle: string;
+  japanese: string | null;
+  poster: string | null;
+  art: string[];
+  description: string;
+  score: number | null;
+  kind: string | null;
+  status: string | null;
+  year: number | null;
+  episodes: number | null;
+  episodesAired: number | null;
+  duration: number | null;
+  rating: string | null;
+  genres: string[];
+  studios: DiscoverNamed[];
+  nextEpisodeAt: string | null;
+  topicId: number | null;
+}
+
+export interface RelatedTitle {
+  relation: string;
+  card: DiscoverCard;
+}
+
+export interface ShikiComment {
+  id: number;
+  author: string;
+  avatar: string | null;
+  body: string;
+  createdAt: string;
+}

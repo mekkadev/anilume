@@ -1,8 +1,16 @@
-import { Match, Show, Switch, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 
 import { Icon } from "./components/Icon";
 import { Player } from "./components/Player";
-import { Sidebar } from "./components/Sidebar";
+import { Rail } from "./components/Rail";
 import { Toasts } from "./components/Toasts";
 import { Discover } from "./routes/Discover";
 import { Downloads } from "./routes/Downloads";
@@ -15,6 +23,7 @@ import { Title } from "./routes/Title";
 import { loadPrefs, restoreSourceConfig } from "./lib/prefs";
 import { checkForUpdate } from "./lib/api";
 import {
+  ambient,
   canGoBack,
   goBack,
   loadSources,
@@ -27,9 +36,7 @@ import {
 } from "./lib/store";
 
 export function App() {
-  const [query, setQuery] = createSignal("");
-  const [scrolled, setScrolled] = createSignal(false);
-  let searchInput: HTMLInputElement | undefined;
+  const [ambientReady, setAmbientReady] = createSignal(false);
 
   onMount(() => {
     loadSources().catch(reportError);
@@ -63,19 +70,18 @@ export function App() {
 
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
-        searchInput?.focus();
-        searchInput?.select();
+        navigate({ name: "search", query: "" });
         return;
       }
 
       if (event.key === "/" && !typing) {
         event.preventDefault();
-        searchInput?.focus();
+        navigate({ name: "search", query: "" });
         return;
       }
 
       if (event.key === "Escape" && typing) {
-        searchInput?.blur();
+        (event.target as HTMLElement).blur();
         return;
       }
 
@@ -88,49 +94,54 @@ export function App() {
     onCleanup(() => window.removeEventListener("keydown", onKeyDown));
   });
 
-  const submitSearch = (event: Event) => {
-    event.preventDefault();
-    const value = query().trim();
-    if (value.length > 0) navigate({ name: "search", query: value });
+  let scroller!: HTMLDivElement;
+
+  createEffect(() => {
+    route();
+    scroller?.scrollTo({ top: 0 });
+  });
+
+  createEffect(() => {
+    const url = ambient();
+    setAmbientReady(false);
+    if (!url) return;
+
+    const probe = new Image();
+    probe.onload = () => {
+      if (ambient() === url) setAmbientReady(true);
+    };
+    probe.src = url;
+  });
+
+  const ambientStyle = () => {
+    const url = ambient();
+    return url ? { "background-image": `url("${url}")` } : {};
   };
 
   return (
-    <>
+    <div class="app">
+      <div class="ambient">
+        <div
+          class="ambient__art"
+          data-shown={Boolean(ambient()) && ambientReady()}
+          style={ambientStyle()}
+        />
+        <div class="ambient__veil" />
+      </div>
+
       <div class="shell">
-        <Sidebar />
+        <Rail />
 
-        <div class="main">
-          <header class="toolbar" data-scrolled={scrolled()}>
-            <button
-              class="tool-btn"
-              onClick={goBack}
-              disabled={!canGoBack()}
-              title="Назад"
-            >
-              <Icon name="back" size={17} />
-            </button>
+        <div class="stage">
+          <div class="stage__drag" />
 
-            <div class="toolbar__spacer" />
+          <div class="stage__scroll" ref={scroller}>
+            <Show when={canGoBack()}>
+              <button class="stage__back" onClick={goBack} title="Назад">
+                <Icon name="back" size={17} />
+              </button>
+            </Show>
 
-            <form class="search-field" onSubmit={submitSearch}>
-              <Icon name="search" size={14} />
-              <input
-                ref={searchInput}
-                type="search"
-                placeholder="Поиск"
-                value={query()}
-                onInput={(event) => setQuery(event.currentTarget.value)}
-                spellcheck={false}
-                autocomplete="off"
-              />
-              <span class="kbd">⌘K</span>
-            </form>
-          </header>
-
-          <main
-            class="content"
-            onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
-          >
             <Switch>
               <Match when={matchRoute(route(), "home")}>
                 <Home />
@@ -157,7 +168,7 @@ export function App() {
                 <Settings />
               </Match>
             </Switch>
-          </main>
+          </div>
         </div>
       </div>
 
@@ -166,6 +177,6 @@ export function App() {
       </Show>
 
       <Toasts />
-    </>
+    </div>
   );
 }
