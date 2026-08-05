@@ -64,7 +64,8 @@ export function Home() {
   const hero = () => heroes()[heroIndex()] ?? null;
   const heroDetail = () => {
     const current = hero();
-    return current ? (details()[current.id] ?? null) : null;
+    const found = current ? (details()[current.id] ?? null) : null;
+    return found && found.loaded ? found : null;
   };
 
   const heroArt = () => {
@@ -80,6 +81,7 @@ export function Home() {
       setDetails({
         ...details(),
         [card.id]: {
+          loaded: true,
           art: detail.art,
           description: detail.description,
           genres: detail.genres,
@@ -89,7 +91,7 @@ export function Home() {
     } catch {
       setDetails({
         ...details(),
-        [card.id]: { art: [], description: "", genres: [], studio: null },
+        [card.id]: { loaded: false, art: [], description: "", genres: [], studio: null },
       });
     }
   };
@@ -124,7 +126,7 @@ export function Home() {
 
   return (
     <div class="fade-in">
-      <Show when={hero()} fallback={<div class="hero hero--empty" />}>
+      <Show when={hero()} fallback={<Show when={popular.loading}><div class="hero hero--empty" /></Show>}>
         {(current) => (
           <section class="hero">
             <div class="hero__art" data-fallback={!heroArt()}>
@@ -171,9 +173,9 @@ export function Home() {
                 </For>
               </div>
 
-              <p class="hero__text">
-                {heroDetail()?.description || "Описание пока не подгрузилось."}
-              </p>
+              <Show when={heroDetail()?.description}>
+                <p class="hero__text">{heroDetail()!.description}</p>
+              </Show>
 
               <div class="hero__foot">
                 <div class="hero__dots">
@@ -199,6 +201,16 @@ export function Home() {
             </div>
           </section>
         )}
+      </Show>
+
+      <Show when={popular.error && !popular.loading}>
+        <div class="empty">
+          <div class="empty__title">Каталог Shikimori не отвечает</div>
+          <p>
+            Подборки и описания подтянутся, когда он вернётся. Список ниже —
+            из выбранного источника, он работает сам по себе.
+          </p>
+        </div>
       </Show>
 
       <Show when={(continueList() ?? []).length > 0}>
@@ -276,6 +288,7 @@ export function Home() {
 }
 
 interface HeroDetail {
+  loaded: boolean;
   art: string[];
   description: string;
   genres: string[];

@@ -8,6 +8,10 @@ use crate::error::{CoreError, Result};
 pub const CATALOG_BASE: &str = "https://shikimori.one";
 
 const MIN_REQUEST_GAP: Duration = Duration::from_millis(240);
+const WINDOW: Duration = Duration::from_secs(60);
+const WINDOW_LIMIT: usize = 80;
+const RETRIES: usize = 3;
+const RETRY_BACKOFF: Duration = Duration::from_millis(600);
 const PAGE_SIZE: i64 = 40;
 const MAX_PAGE: i64 = 100;
 const YEAR_FLOOR: i64 = 1960;
@@ -494,16 +498,43 @@ fn detail_from_raw(raw: RawDetail) -> TitleDetail {
     }
 }
 
+pub fn normalise(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut space = false;
+    for ch in value.chars() {
+        if ch.is_alphanumeric() {
+            if space && !out.is_empty() {
+                out.push(' ');
+            }
+            space = false;
+            out.extend(ch.to_lowercase());
+        } else {
+            space = true;
+        }
+    }
+    out
+}
+
+fn plausible(needle: &str, card: &DiscoverCard) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    [&card.title, &card.original_title].into_iter().any(|title| {
+        let other = normalise(title);
+        !other.is_empty() && (other == needle || other.contains(needle) || needle.contains(&other))
+    })
+}
+
 fn best_match(name: &str, year: Option<i64>, cards: Vec<DiscoverCard>) -> Option<DiscoverCard> {
-    let needle = name.trim().to_lowercase();
-    let same_name = |card: &DiscoverCard| {
-        card.title.to_lowercase() == needle || card.original_title.to_lowercase() == needle
+    let needle = normalise(name);
+    let exact = |card: &DiscoverCard| {
+        normalise(&card.title) == needle || normalise(&card.original_title) == needle
     };
 
     if let Some(year) = year {
         if let Some(found) = cards
             .iter()
-            .find(|card| same_name(card) && card.year.is_some_and(|value| (value - year).abs() <= 1))
+            .find(|card| exact(card) && card.year.is_some_and(|value| (value - year).abs() <= 1))
         {
             return Some(found.clone());
         }
@@ -511,14 +542,14 @@ fn best_match(name: &str, year: Option<i64>, cards: Vec<DiscoverCard>) -> Option
 
     cards
         .iter()
-        .find(|card| same_name(card))
+        .find(|card| exact(card))
+        .or_else(|| cards.iter().find(|card| plausible(&needle, card)))
         .cloned()
-        .or_else(|| cards.into_iter().next())
 }
 
 pub struct Discover {
     http: reqwest::Client,
-    throttle: Mutex<Option<Instant>>,
+    throttle: Mutex<Vec<Instant>>,
     options: Mutex<Option<DiscoverOptions>>,
 }
 
@@ -528,7 +559,7 @@ impl Discover {
             http: reqwest::Client::builder()
                 .timeout(Duration::from_secs(20))
                 .build()?,
-            throttle: Mutex::new(None),
+            throttle: Mutex::new(Vec::new()),
             options: Mutex::new(None),
         })
     }
@@ -660,16 +691,32 @@ impl Discover {
         path: &str,
         params: &[(String, String)],
     ) -> Result<T> {
-        self.pace().await;
+        let mut attempt = 0;
+        let response = loop {
+            self.pace().await;
 
-        let response = self
-            .http
-            .get(format!("{CATALOG_BASE}{path}"))
-            .query(params)
-            .header(reqwest::header::USER_AGENT, "anilume")
-            .header(reqwest::header::ACCEPT, "application/json")
-            .send()
-            .await?;
+            let sent = self
+                .http
+                .get(format!("{CATALOG_BASE}{path}"))
+                .query(params)
+                .header(reqwest::header::USER_AGENT, "anilume")
+                .header(reqwest::header::ACCEPT, "application/json")
+                .send()
+                .await;
+
+            match sent {
+                Ok(response) if response.status() != reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                    break response
+                }
+                other => {
+                    attempt += 1;
+                    if attempt >= RETRIES {
+                        break other?;
+                    }
+                    tokio::time::sleep(RETRY_BACKOFF * attempt as u32).await;
+                }
+            }
+        };
 
         let status = response.status();
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
@@ -689,14 +736,33 @@ impl Discover {
     }
 
     async fn pace(&self) {
-        let mut last = self.throttle.lock().await;
-        if let Some(previous) = *last {
-            let elapsed = previous.elapsed();
-            if elapsed < MIN_REQUEST_GAP {
-                tokio::time::sleep(MIN_REQUEST_GAP - elapsed).await;
-            }
+        let wait = {
+            let mut recent = self.throttle.lock().await;
+            let now = Instant::now();
+            recent.retain(|stamp| now.duration_since(*stamp) < WINDOW);
+
+            let by_gap = recent
+                .last()
+                .map(|last| MIN_REQUEST_GAP.saturating_sub(now.duration_since(*last)))
+                .unwrap_or_default();
+
+            let by_window = if recent.len() >= WINDOW_LIMIT {
+                recent
+                    .first()
+                    .map(|oldest| WINDOW.saturating_sub(now.duration_since(*oldest)))
+                    .unwrap_or_default()
+            } else {
+                Duration::ZERO
+            };
+
+            let wait = by_gap.max(by_window);
+            recent.push(now + wait);
+            wait
+        };
+
+        if !wait.is_zero() {
+            tokio::time::sleep(wait).await;
         }
-        *last = Some(Instant::now());
     }
 }
 
@@ -949,10 +1015,40 @@ mod tests {
     }
 
     #[test]
-    fn matching_falls_back_to_the_first_result_and_survives_an_empty_list() {
+    fn an_unrelated_first_result_is_refused_rather_than_guessed() {
         let found = best_match("что-то другое", None, vec![card(7, "Ван-Пис", "One Piece", None)]);
-        assert_eq!(found.unwrap().id, 7);
+        assert_eq!(found, None);
         assert_eq!(best_match("что угодно", None, Vec::new()), None);
+    }
+
+    #[test]
+    fn a_longer_shikimori_title_still_counts_as_the_same_anime() {
+        let found = best_match(
+            "Ванпанчмен 3",
+            None,
+            vec![
+                card(1, "Люпен III: Часть III", "Lupin III: Part III", Some(1984)),
+                card(2, "Ванпанчмен 3. Часть 2", "One Punch Man 3 Part 2", Some(2026)),
+            ],
+        );
+        assert_eq!(found.unwrap().id, 2);
+    }
+
+    #[test]
+    fn punctuation_and_case_do_not_break_the_match() {
+        let found = best_match(
+            "ван-пис!",
+            None,
+            vec![card(7, "Ван Пис", "One Piece", Some(1999))],
+        );
+        assert_eq!(found.unwrap().id, 7);
+    }
+
+    #[test]
+    fn normalising_collapses_punctuation_and_case() {
+        assert_eq!(normalise("  Ван-Пис: Фильм!  "), "ван пис фильм");
+        assert_eq!(normalise("One  Punch_Man 3"), "one punch man 3");
+        assert_eq!(normalise("!!!"), "");
     }
 
     #[test]

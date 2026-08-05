@@ -166,22 +166,23 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     void api.settingSet(sourceSettingKey(props.query), key).catch(() => undefined);
   };
 
-  const [detail] = createResource(
+  const [detailRes] = createResource(
     () => active()?.handle ?? null,
     (handle) => api.anime(handle),
   );
+  const detail = () => (detailRes.state === "ready" ? detailRes() : undefined);
 
-  const [progress, { refetch: refetchProgress }] = createResource(
+  const [progressRes, { refetch: refetchProgress }] = createResource(
     () => [source(), animeKey()] as const,
     ([source, key]) => api.animeProgress(source, key),
   );
 
-  const [libraryEntry, { refetch: refetchLibrary }] = createResource(
+  const [libraryRes, { refetch: refetchLibrary }] = createResource(
     () => [source(), animeKey()] as const,
     ([source, key]) => api.libraryGet(source, key),
   );
 
-  const [shiki] = createResource(
+  const [shikiRes] = createResource(
     () => detail(),
     async (info) => {
       const known = info.meta.shikimoriId ?? info.meta.malId;
@@ -193,20 +194,27 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     },
   );
 
-  const [related] = createResource(
+  const [relatedRes] = createResource(
     () => shiki()?.id ?? null,
     (id) => api.discoverRelated(id),
   );
 
-  const [similar] = createResource(
+  const [similarRes] = createResource(
     () => shiki()?.id ?? null,
     (id) => api.discoverSimilar(id, 16),
   );
 
-  const [comments] = createResource(
+  const [commentsRes] = createResource(
     () => shiki()?.topicId ?? null,
     (topicId) => api.discoverComments(topicId, 15),
   );
+
+  const shiki = () => (shikiRes.state === "ready" ? shikiRes() : null);
+  const related = () => (relatedRes.state === "ready" ? relatedRes() : undefined);
+  const similar = () => (similarRes.state === "ready" ? similarRes() : undefined);
+  const comments = () => (commentsRes.state === "ready" ? commentsRes() : undefined);
+  const progress = () => (progressRes.state === "ready" ? progressRes() : undefined);
+  const libraryEntry = () => (libraryRes.state === "ready" ? libraryRes() : undefined);
 
   const heroArt = () => shiki()?.art[0] ?? bannerFor(shiki()?.id) ?? null;
   const poster = () =>
