@@ -222,6 +222,12 @@ jobs:
       - name: Показать, что собрали
         run: ls -lh artifacts
 
+      - name: Определить номер версии
+        id: meta
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
@@ -255,7 +261,7 @@ jobs:
 
             ```bash
             curl -L -o ~/Downloads/anilume.dmg \
-              https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.1_aarch64.dmg
+              https://github.com/mekkadev/anilume/releases/download/${{ github.event.inputs.tag || github.ref_name }}/anilume_${{ steps.meta.outputs.version }}_aarch64.dmg
             open ~/Downloads/anilume.dmg
             ```
 
