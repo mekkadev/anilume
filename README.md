@@ -32,11 +32,11 @@ anilume идёт другим путём. [anicli-api](https://github.com/vypivs
 
 | файл | для чего |
 | --- | --- |
-| `anilume_0.3.1_aarch64.dmg` | macOS 11+ на Apple Silicon, 40 МБ |
-| `anilume-0.3.1-macos-arm64-portable.zip` | то же без установки |
-| `anilume_0.3.1_x64-setup.exe` | Windows 10/11 x64, 52 МБ |
-| `anilume_0.3.1_x64_en-US.msi` | он же в MSI, 64 МБ |
-| `anilume-0.3.1-windows-x64-portable.zip` | без установки |
+| `anilume_0.3.2_aarch64.dmg` | macOS 11+ на Apple Silicon, 40 МБ |
+| `anilume-0.3.2-macos-arm64-portable.zip` | то же без установки |
+| `anilume_0.3.2_x64-setup.exe` | Windows 10/11 x64, 52 МБ |
+| `anilume_0.3.2_x64_en-US.msi` | он же в MSI, 64 МБ |
+| `anilume-0.3.2-windows-x64-portable.zip` | без установки |
 
 Портативные сборки запускаются через `anilume-portable.cmd`
 (`anilume-portable.command` на macOS): база, история и скачанные серии лягут
@@ -59,7 +59,7 @@ anilume идёт другим путём. [anicli-api](https://github.com/vypivs
 
 ```bash
 curl -L -o ~/Downloads/anilume.dmg \
-  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.1_aarch64.dmg
+  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.2_aarch64.dmg
 open ~/Downloads/anilume.dmg
 ```
 
@@ -111,8 +111,10 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 её сезоны, похожее и обсуждение под ней. Тайтл, открытый из источника,
 сопоставляется с Shikimori по названию и году, если источник не отдал id.
 
-Запросы идут не чаще одного в 240 мс, чтобы не упереться в лимит Shikimori,
-а списки жанров и студий тянутся один раз за запуск и держатся в памяти.
+Запросы идут не чаще одного в 240 мс и не больше восьмидесяти в минуту — у
+Shikimori лимит и на секунду, и на минуту, и одной паузы между запросами мало.
+Обрыв связи и 429 переживаются тремя попытками с нарастающей задержкой. Списки
+жанров и студий тянутся один раз за запуск и держатся в памяти.
 
 ## откуда обложки
 
@@ -283,7 +285,7 @@ npm run app:build        # бандл
 
 ```bash
 pytest                          # 55 тестов сайдкара, без сети
-cargo test -p anilume-core      # 86 тестов ядра, включая живой прокси
+cargo test -p anilume-core      # 89 тестов ядра, включая живой прокси
 npm run typecheck
 python scripts/design_lint.py   # правила оформления
 ```
@@ -382,7 +384,7 @@ nothing to attach.
 
 ```bash
 curl -L -o ~/Downloads/anilume.dmg \
-  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.1_aarch64.dmg
+  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.2_aarch64.dmg
 open ~/Downloads/anilume.dmg
 ```
 
@@ -433,8 +435,9 @@ watch it is decided on its own page.
 the same connection feeds the home rows, the studio and runtime on a title page,
 its seasons, what else is like it, and the discussion under it. a title opened
 from a source is matched back to shikimori by name and year when the source did
-not hand over an id. requests are paced to one every 240ms to stay inside
-shikimori's rate limit.
+not hand over an id. requests are paced to one every 240ms and eighty a minute —
+shikimori limits both, and a gap between requests alone is not enough — and a
+dropped connection or a 429 is retried three times with a growing delay.
 
 ## where the art comes from
 
@@ -598,7 +601,7 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 55, sidecar, no network
-cargo test -p anilume-core      # 86, includes a real proxy round-trip
+cargo test -p anilume-core      # 89, includes a real proxy round-trip
 npm run typecheck
 python scripts/design_lint.py
 ```
