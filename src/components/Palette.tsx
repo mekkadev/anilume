@@ -97,6 +97,8 @@ export function Palette() {
         name: "title",
         query: hit.card.title,
         aliases: [hit.card.originalTitle],
+        year: hit.card.year,
+        shikiId: hit.card.id,
       });
     } else {
       navigate({
@@ -104,6 +106,7 @@ export function Palette() {
         query: hit.card.title,
         aliases: [hit.card.meta.altTitle ?? ""],
         card: hit.card,
+        year: hit.card.meta.year,
       });
     }
   };

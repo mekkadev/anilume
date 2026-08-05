@@ -281,9 +281,15 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
             title: string;
             episodes: { ordinal: number; title: string }[];
           };
+          const byHandle = (config.fixtures.anime_by_handle ?? {}) as Record<
+            string,
+            { title: string }
+          >;
+          const named = byHandle[handle];
           value = {
             ...base,
-            title: anyWindow.__QUERY__ ?? base.title,
+            ...(named ?? {}),
+            title: named ? named.title : (anyWindow.__QUERY__ ?? base.title),
             episodes: base.episodes.map((episode) => ({
               ...episode,
               handle: `${handle}:ep-${episode.ordinal}`,

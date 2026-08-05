@@ -130,10 +130,17 @@ export function Home() {
       query: card.title,
       aliases: [card.meta.altTitle ?? ""],
       card,
+      year: card.meta.year,
     });
 
   const openShiki = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.originalTitle],
+      year: card.year,
+      shikiId: card.id,
+    });
 
   const openContinue = (item: ContinueItem) =>
     navigate({ name: "title", query: item.animeTitle, source: item.source });

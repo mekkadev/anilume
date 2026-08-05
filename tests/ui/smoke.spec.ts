@@ -197,6 +197,106 @@ test("чужой тайтл с похожим словом не открывае
   await expect(page.locator(".title-info__name")).toHaveCount(0);
 });
 
+test("текст не вылезает за границы кнопок", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+  await page.locator(".card").first().click();
+  await expect(page.locator(".picker__item").first()).toBeVisible({ timeout: 10000 });
+
+  const escaped = await page.evaluate(() => {
+    const selectors = [".picker__item", ".dub", ".btn", ".menu__item", ".filter"];
+    const bad: string[] = [];
+
+    for (const selector of selectors) {
+      for (const node of Array.from(document.querySelectorAll(selector))) {
+        const box = node.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) continue;
+
+        for (const child of Array.from(node.children)) {
+          const inner = child.getBoundingClientRect();
+          if (inner.width === 0 || inner.height === 0) continue;
+          if (inner.top < box.top - 0.5 || inner.bottom > box.bottom + 0.5) {
+            bad.push(`${selector} → ${child.className || child.tagName}`);
+          }
+        }
+      }
+    }
+    return bad;
+  });
+
+  expect(escaped.join(" | ")).toEqual("");
+});
+
+test("одноимённые тайтлы разных лет не путаются", async ({ page }) => {
+  const shiki = {
+    id: 300,
+    title: "Хантер х Хантер",
+    originalTitle: "Hunter x Hunter",
+    poster: "https://stub.local/hxh.png",
+    score: 9.1,
+    kind: "tv",
+    status: "released",
+    year: 2011,
+    episodes: 148,
+  };
+
+  await installTauri(page, {
+    overrides: {
+      discover_search: [shiki],
+      discover_match: shiki,
+      discover_title: {
+        ...shiki,
+        japanese: "ハンター×ハンター",
+        art: [],
+        description: "Описание.",
+        episodesAired: 148,
+        duration: 24,
+        rating: "pg_13",
+        genres: [],
+        studios: [],
+        nextEpisodeAt: null,
+        topicId: null,
+      },
+      discover_similar: [],
+      discover_related: [],
+      catalog_search: {
+        query: "",
+        items: [
+          {
+            ...SOURCE_CARD,
+            handle: "hxh-1999",
+            title: "Хантер х Хантер",
+            key: "k-hxh-1999",
+            meta: { ...SOURCE_CARD.meta, year: 1999 },
+          },
+          {
+            ...SOURCE_CARD,
+            handle: "hxh-2011",
+            title: "Хантер х Хантер",
+            key: "k-hxh-2011",
+            meta: { ...SOURCE_CARD.meta, year: 2011 },
+          },
+        ],
+      },
+      catalog_search_multi: { query: "", groups: [], failures: [] },
+      anime_by_handle: {
+        "hxh-1999": { title: "Хантер х Хантер 1999" },
+        "hxh-2011": { title: "Хантер х Хантер 2011" },
+      },
+    },
+  });
+
+  await page.goto("/");
+  await page.keyboard.press("/");
+  await page.locator(".palette__field input").fill("хантер");
+  await expect(page.locator(".palette__hit")).toHaveCount(1, { timeout: 8000 });
+  await page.keyboard.press("Enter");
+
+  await expect(page.locator(".title-info__name")).toHaveText("Хантер х Хантер 2011", {
+    timeout: 10000,
+  });
+});
+
 test("осечка источника переключает на следующий сама", async ({ page }) => {
   await installTauri(page, {
     failWhen: { episode_studios: "search-0:" },

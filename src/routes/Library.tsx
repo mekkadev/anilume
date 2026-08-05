@@ -29,7 +29,12 @@ export function Library() {
   const open = async (entry: LibraryEntry) => {
     setOpening(entry.animeKey);
     try {
-      navigate({ name: "title", query: entry.title, source: entry.source });
+      navigate({
+        name: "title",
+        query: entry.title,
+        source: entry.source,
+        shikiId: entry.shikimoriId,
+      });
     } catch (error) {
       reportError(error);
     } finally {

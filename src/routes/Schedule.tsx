@@ -89,6 +89,8 @@ export function Schedule() {
       name: "title",
       query: item.card.title,
       aliases: [item.card.originalTitle],
+      year: item.card.year,
+      shikiId: item.card.id,
     });
 
   return (

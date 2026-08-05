@@ -15,6 +15,8 @@ export type Route =
       aliases?: string[];
       card?: AnimeCard;
       source?: string;
+      year?: number | null;
+      shikiId?: number | null;
     }
   | { name: "library" }
   | { name: "history" }

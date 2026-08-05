@@ -183,6 +183,8 @@ export function App() {
                           aliases={target.aliases}
                           card={target.card}
                           source={target.source}
+                          year={target.year}
+                          shikiId={target.shikiId}
                         />
                       )}
                     </Show>

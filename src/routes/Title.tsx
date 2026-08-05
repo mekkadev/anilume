@@ -67,8 +67,8 @@ function studioSettingKey(source: string, animeKey: string) {
   return `studio:${source}:${animeKey}`;
 }
 
-function sourceSettingKey(query: string) {
-  return `source:${query.trim().toLowerCase()}`;
+function sourceSettingKey(query: string, year?: number | null) {
+  return `source:${query.trim().toLowerCase()}${year ? `:${year}` : ""}`;
 }
 
 interface Resolved {
@@ -79,8 +79,14 @@ interface Resolved {
   videos: VideoInfo[];
 }
 
-function pickBest(items: AnimeCard[], aliases: string[]) {
-  return pickMatch(items, aliases, (item) => item.title);
+function pickBest(items: AnimeCard[], aliases: string[], year?: number | null) {
+  return pickMatch(
+    items,
+    aliases,
+    (item) => item.title,
+    year,
+    (item) => item.meta.year,
+  );
 }
 
 export function Title(props: {
@@ -88,11 +94,15 @@ export function Title(props: {
   aliases?: string[];
   card?: AnimeCard;
   source?: string;
+  year?: number | null;
+  shikiId?: number | null;
 }) {
   const names = () => {
     const found = [props.query, ...(props.aliases ?? [])];
     return [...new Set(found.map((item) => item.trim()).filter(Boolean))];
   };
+
+  const wantYear = () => props.year ?? props.card?.meta.year ?? null;
 
   const [candidates, setCandidates] = createSignal<Record<string, AnimeCard>>({});
   const [chosen, setChosen] = createSignal<string | null>(null);
@@ -118,7 +128,7 @@ export function Title(props: {
       }
 
       const stored = await api
-        .settingGet(sourceSettingKey(query))
+        .settingGet(sourceSettingKey(query, wantYear()))
         .catch(() => null);
 
       const order = [stored, props.source, activeSource()].filter(
@@ -131,7 +141,7 @@ export function Title(props: {
         tried.add(key);
         const found = await api
           .search(key, query)
-          .then((result) => pickBest(result.items, names()))
+          .then((result) => pickBest(result.items, names(), wantYear()))
           .catch(() => null);
         if (found) {
           remember(found);
@@ -181,7 +191,7 @@ export function Title(props: {
       const result = await api.searchMulti(rest, props.query);
       const merged = { ...candidates() };
       for (const group of result.groups) {
-        const best = pickBest(group.items, names());
+        const best = pickBest(group.items, names(), wantYear());
         if (best) merged[group.source] = best;
       }
       setCandidates(merged);
@@ -240,7 +250,7 @@ export function Title(props: {
 
     setChosen(best.source);
     void api
-      .settingSet(sourceSettingKey(props.query), best.source)
+      .settingSet(sourceSettingKey(props.query, wantYear()), best.source)
       .catch(() => undefined);
   });
 
@@ -255,7 +265,7 @@ export function Title(props: {
     if (key === chosen()) return;
     if (byHand) setPinned(true);
     setChosen(key);
-    void api.settingSet(sourceSettingKey(props.query), key).catch(() => undefined);
+    void api.settingSet(sourceSettingKey(props.query, wantYear()), key).catch(() => undefined);
   };
 
   const [detailRes] = createResource(
@@ -286,12 +296,25 @@ export function Title(props: {
   );
 
   const [shikiRes] = createResource(
-    () => detail(),
-    async (info) => {
+    () => {
+      const known = props.shikiId;
+      if (known) return { id: known, info: null };
+      const info = detail();
+      return info ? { id: null, info } : null;
+    },
+    async (input) => {
+      if (input.id) return await api.discoverTitle(input.id);
+
+      const info = input.info!;
       const known = info.meta.shikimoriId ?? info.meta.malId;
       const id =
         known ??
-        (await api.discoverMatch(info.title, info.meta.year ?? undefined))?.id ??
+        (
+          await api.discoverMatch(
+            info.title,
+            info.meta.year ?? wantYear() ?? undefined,
+          )
+        )?.id ??
         null;
       return id ? await api.discoverTitle(id) : null;
     },
@@ -337,7 +360,13 @@ export function Title(props: {
   onCleanup(() => setAmbient(null));
 
   const openShiki = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.originalTitle],
+      year: card.year,
+      shikiId: card.id,
+    });
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [pickedDub, setPickedDub] = createSignal(false);
@@ -737,7 +766,12 @@ export function Title(props: {
         fallback={
           <Show
             when={decided() && scanned() && available().length === 0}
-            fallback={<TitleSkeleton />}
+            fallback={
+              <TitleSkeleton
+                title={props.query}
+                poster={posterFor(props.shikiId, props.card?.poster ?? null)}
+              />
+            }
           >
             <div class="empty">
               <div class="empty__title">
@@ -1290,13 +1324,27 @@ function LibraryMenu(props: {
   );
 }
 
-function TitleSkeleton() {
+function TitleSkeleton(props: { title?: string; poster?: string | null }) {
   return (
     <div class="title-hero">
       <div class="title-hero__grid">
-        <div class="title-poster skeleton" />
+        <Show
+          when={props.poster}
+          fallback={<div class="title-poster skeleton" />}
+        >
+          <div class="title-poster">
+            <Art src={props.poster!} title={props.title ?? ""} eager />
+          </div>
+        </Show>
         <div class="title-info">
-          <div class="skeleton" style={{ height: "30px", width: "58%", "border-radius": "7px" }} />
+          <Show
+            when={props.title}
+            fallback={
+              <div class="skeleton" style={{ height: "30px", width: "58%", "border-radius": "7px" }} />
+            }
+          >
+            <h1 class="title-info__name">{props.title}</h1>
+          </Show>
           <div class="skeleton" style={{ height: "14px", width: "34%", "border-radius": "5px", "margin-top": "12px" }} />
           <div class="skeleton" style={{ height: "64px", width: "100%", "border-radius": "9px", "margin-top": "20px" }} />
         </div>

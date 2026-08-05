@@ -228,7 +228,13 @@ export function Discover() {
   };
 
   const open = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.originalTitle],
+      year: card.year,
+      shikiId: card.id,
+    });
 
   return (
     <div class="fade-in">

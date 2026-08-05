@@ -72,6 +72,7 @@ export function Search(props: { query: string }) {
       query: card.title,
       aliases: [card.meta.altTitle ?? ""],
       card,
+      year: card.meta.year,
     });
 
   return (

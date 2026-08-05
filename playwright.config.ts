@@ -19,7 +19,20 @@ export default defineConfig({
     viewport: { width: 1380, height: 900 },
   },
 
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: "**/audit.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "audit",
+      testMatch: "**/audit.spec.ts",
+      fullyParallel: false,
+      dependencies: ["chromium"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
 
   webServer: {
     command: `npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
