@@ -20,6 +20,8 @@ UPSTREAM_TIMEOUT = 12.0
 PROBE_TIMEOUT = 20.0
 QUALITY_TIMEOUT = 14.0
 PROBE_STUDIOS = 4
+QUALITY_PARALLEL = 8
+QUALITY_LIMIT = 60
 
 def _require(params: dict[str, Any], name: str) -> Any:
     value = params.get(name)
@@ -258,6 +260,8 @@ class AnilumeService:
         if not isinstance(handles, list):
             raise RpcError(INVALID_PARAMS, "Параметр «handles» должен быть списком")
 
+        gate = asyncio.Semaphore(QUALITY_PARALLEL)
+
         async def measure(handle: Any) -> dict[str, Any]:
             key = str(handle)
             record = self.handles.peek(key)
@@ -265,10 +269,11 @@ class AnilumeService:
                 return {"handle": key, "quality": None, "error": "карточка устарела"}
 
             try:
-                videos = await asyncio.wait_for(
-                    _call(record.source_key, "videos", record.obj.a_get_videos()),
-                    timeout=QUALITY_TIMEOUT,
-                )
+                async with gate:
+                    videos = await asyncio.wait_for(
+                        _call(record.source_key, "videos", record.obj.a_get_videos()),
+                        timeout=QUALITY_TIMEOUT,
+                    )
             except asyncio.TimeoutError:
                 return {"handle": key, "quality": None, "error": "плеер не ответил вовремя"}
             except RpcError as exc:
@@ -280,7 +285,8 @@ class AnilumeService:
             return {"handle": key, "quality": best or None, "error": None}
 
         found = await asyncio.gather(
-            *(measure(handle) for handle in handles), return_exceptions=True
+            *(measure(handle) for handle in handles[:QUALITY_LIMIT]),
+            return_exceptions=True,
         )
         return {"qualities": [item for item in found if isinstance(item, dict)]}
 
