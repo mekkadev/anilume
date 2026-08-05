@@ -18,7 +18,6 @@
     "opener:allow-reveal-item-in-dir",
     "os:allow-platform",
     "dialog:allow-open",
-    "core:asset:default",
     "updater:default",
     "process:allow-restart"
   ]

@@ -7,6 +7,16 @@ use state::AppState;
 
 pub const DOWNLOAD_EVENT: &str = "anilume://download-progress";
 
+fn override_dir(variable: &str) -> Option<std::path::PathBuf> {
+    let raw = std::env::var_os(variable)?;
+    let path = std::path::PathBuf::from(raw);
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+    std::fs::create_dir_all(&path).ok()?;
+    Some(path)
+}
+
 pub fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -24,15 +34,19 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            let data_dir = handle
-                .path()
-                .app_data_dir()
-                .unwrap_or_else(|_| std::env::temp_dir().join("anilume"));
-            let downloads_dir = handle
-                .path()
-                .video_dir()
-                .map(|dir| dir.join("anilume"))
-                .unwrap_or_else(|_| data_dir.join("downloads"));
+            let data_dir = override_dir("ANILUME_DATA_DIR").unwrap_or_else(|| {
+                handle
+                    .path()
+                    .app_data_dir()
+                    .unwrap_or_else(|_| std::env::temp_dir().join("anilume"))
+            });
+            let downloads_dir = override_dir("ANILUME_DOWNLOADS_DIR").unwrap_or_else(|| {
+                handle
+                    .path()
+                    .video_dir()
+                    .map(|dir| dir.join("anilume"))
+                    .unwrap_or_else(|_| data_dir.join("downloads"))
+            });
 
             let state = tauri::async_runtime::block_on(AppState::initialize(
                 data_dir,

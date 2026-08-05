@@ -117,6 +117,71 @@ jobs:
             npm run tauri build -- --target ${{ matrix.target }}
           fi
 
+      - name: Собрать портативную версию для Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          name="anilume-$version-windows-x64"
+          root="portable/$name"
+          mkdir -p "$root" artifacts
+
+          cp "src-tauri/target/${{ matrix.target }}/release/anilume.exe" "$root/anilume.exe"
+          cp "src-tauri/binaries/anilume-sidecar-${{ matrix.target }}.exe" "$root/anilume-sidecar.exe"
+          cp "src-tauri/binaries/ffmpeg-${{ matrix.target }}.exe" "$root/ffmpeg.exe"
+
+          printf '%s\r\n' \
+            '@echo off' \
+            'set "ANILUME_DATA_DIR=%~dp0data"' \
+            'set "ANILUME_DOWNLOADS_DIR=%~dp0downloads"' \
+            'start "" "%~dp0anilume.exe"' > "$root/anilume-portable.cmd"
+
+          printf '%s\r\n' \
+            'anilume, портативная сборка.' \
+            '' \
+            'Запускать через anilume-portable.cmd: база и скачанные серии лягут' \
+            'в папки data и downloads рядом с exe, в системе не останется ничего.' \
+            'Обычный запуск anilume.exe тоже работает, но данные уйдут в %APPDATA%.' \
+            '' \
+            'Нужен Microsoft Edge WebView2 — он есть в Windows 10 21H2 и новее.' \
+            '' \
+            'Сборка не подписана: SmartScreen попросит «Подробнее», затем' \
+            '«Выполнить в любом случае».' > "$root/ПРОЧТИ.txt"
+
+          ( cd portable && 7z a -tzip "../artifacts/$name-portable.zip" "$name" > /dev/null )
+
+      - name: Собрать портативную версию для macOS
+        if: matrix.os == 'macos-14'
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          name="anilume-$version-macos-arm64"
+          root="portable/$name"
+          mkdir -p "$root" artifacts
+
+          cp -R "src-tauri/target/${{ matrix.target }}/release/bundle/macos/anilume.app" "$root/"
+          xattr -cr "$root/anilume.app" || true
+
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'here=$(cd "$(dirname "$0")" && pwd)' \
+            'export ANILUME_DATA_DIR="$here/data"' \
+            'export ANILUME_DOWNLOADS_DIR="$here/downloads"' \
+            'exec "$here/anilume.app/Contents/MacOS/anilume"' > "$root/anilume-portable.command"
+          chmod +x "$root/anilume-portable.command"
+
+          printf '%s\n' \
+            'anilume, портативная сборка.' \
+            '' \
+            'Запускать через anilume-portable.command: база и скачанные серии лягут' \
+            'в папки data и downloads рядом с приложением. Обычный запуск' \
+            'anilume.app тоже работает, но данные уйдут в ~/Library/Application Support.' \
+            '' \
+            'Сборка не подписана, поэтому перед первым запуском:' \
+            '  xattr -dr com.apple.quarantine путь/к/anilume.app' > "$root/ПРОЧТИ.txt"
+
+          ditto -c -k --sequesterRsrc --keepParent "$root" "artifacts/$name-portable.zip"
+
       - name: Собрать список файлов
         id: collect
         shell: bash
@@ -158,8 +223,16 @@ jobs:
 
             | файл | для чего |
             | --- | --- |
-            | `.dmg` | macOS 11+ на Apple Silicon |
-            | `.msi` или `.exe` | Windows 10/11 x64 |
+            | `.dmg` | macOS 11+ на Apple Silicon, обычная установка |
+            | `-macos-arm64-portable.zip` | то же самое, но без установки |
+            | `-setup.exe` или `.msi` | Windows 10/11 x64, обычная установка |
+            | `-windows-x64-portable.zip` | то же самое, но без установки |
+
+            **Портативные сборки** запускаются через `anilume-portable.cmd`
+            (`anilume-portable.command` на macOS): база и скачанные серии лягут
+            в папки `data` и `downloads` рядом с приложением, в системе не
+            останется ничего. Внутри уже лежат сайдкар и ffmpeg — докачивать
+            нечего.
 
             **Сборки не подписаны.** macOS положит приложение в карантин:
 
@@ -167,11 +240,14 @@ jobs:
             xattr -dr com.apple.quarantine /Applications/anilume.app
             ```
 
-            В Windows SmartScreen нужно нажать «Подробнее» → «Выполнить в любом случае».
+            В Windows SmartScreen нужно нажать «Подробнее» → «Выполнить в любом
+            случае». Windows-сборке нужен Microsoft Edge WebView2 — он есть
+            в Windows 10 21H2 и новее.
 
-            Скачивание серий требует установленного ffmpeg — он намеренно не входит
-            в сборку. Синхронизация с Shikimori требует своего OAuth-приложения,
-            как описано в README.
+            Синхронизация с Shikimori требует своего OAuth-приложения, как
+            описано в README. Подбор по жанрам, студиям и годам, а также
+            описания, сезоны и комментарии на странице аниме работают без
+            всякой авторизации.
 
-            Часть источников (AnimeGO, Kodik, Aniboom) отдаёт контент только с IP СНГ.
-            AniLibria и Yummy Anime работают без VPN.
+            Часть источников (AnimeGO, Kodik, Aniboom) отдаёт контент только
+            с IP СНГ. AniLibria и AnimeLib работают без VPN.

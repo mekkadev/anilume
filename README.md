@@ -71,7 +71,13 @@ them as shorthand; icons carry it instead.
 
 ## install
 
-grab a build from [releases](https://github.com/mekkadev/anilume/releases) — `.dmg` for apple silicon, `.msi` or `.exe` for windows x64.
+grab a build from [releases](https://github.com/mekkadev/anilume/releases) — `.dmg` for apple silicon, `.msi` or `-setup.exe` for windows x64.
+
+there is a portable zip for each too. it carries the same binary plus the sidecar
+and ffmpeg, and a launcher that points `ANILUME_DATA_DIR` and
+`ANILUME_DOWNLOADS_DIR` at folders next to the app, so nothing is written outside
+the folder you unpacked. those two variables work in the installed builds as well
+if you would rather keep the database somewhere specific.
 
 neither build is signed. on macos:
 
