@@ -44,7 +44,26 @@ anilume идёт другим путём. [anicli-api](https://github.com/vypivs
 Те же переменные `ANILUME_DATA_DIR` и `ANILUME_DOWNLOADS_DIR` работают
 и в обычных сборках, если хочется держать базу в конкретном месте.
 
-Ни одна сборка не подписана. На macOS:
+Ни одна сборка не подписана: нотаризация у Apple стоит 99 долларов в год,
+и пока их никто не платит, macOS будет ругаться на первый запуск. Обойти это
+можно без Терминала.
+
+**Самый простой способ.** Запустить приложение, получить отказ, затем открыть
+Системные настройки → Конфиденциальность и безопасность, пролистать вниз до
+строки про заблокированное приложение и нажать «Всё равно открыть». Подтвердить
+паролем или Touch ID. Один раз на версию. На macOS 14 и старше то же самое
+делается быстрее: правый клик по приложению → «Открыть» → «Открыть».
+
+**Способ, при котором ругани не будет вообще.** Карантин вешает не система,
+а браузер, который скачал файл. Если скачать мимо браузера, вешать нечего:
+
+```bash
+curl -L -o ~/Downloads/anilume.dmg \
+  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.1_aarch64.dmg
+open ~/Downloads/anilume.dmg
+```
+
+**Если приложение уже скачано браузером** и хочется одной командой:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/anilume.app
@@ -344,7 +363,24 @@ the portable builds launch through `anilume-portable.cmd`
 `ANILUME_DOWNLOADS_DIR` at folders next to the app, so nothing is written
 outside the folder you unpacked. both variables work in the installed builds too.
 
-neither build is signed. on macos:
+neither build is signed — apple notarisation costs $99 a year and nobody is
+paying it, so macos will object to the first launch. no terminal is needed to
+get past it: launch the app, let it be refused, then open system settings →
+privacy & security, scroll to the line about the blocked app and press "open
+anyway". once per version. on macos 14 and earlier, right-click → open → open
+does the same thing faster.
+
+there is also a way to never see the warning: quarantine is attached by the
+browser that downloaded the file, so downloading outside a browser leaves
+nothing to attach.
+
+```bash
+curl -L -o ~/Downloads/anilume.dmg \
+  https://github.com/mekkadev/anilume/releases/latest/download/anilume_0.3.1_aarch64.dmg
+open ~/Downloads/anilume.dmg
+```
+
+and if it is already downloaded, one command clears the flag:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/anilume.app
