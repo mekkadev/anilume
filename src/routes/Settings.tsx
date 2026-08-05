@@ -2,6 +2,7 @@ import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { extractToken } from "../lib/format";
 import { activeSource, pushToast, reportError, setActiveSource, sources } from "../lib/store";
 
 const OOB = "urn:ietf:wg:oauth:2.0:oob";
@@ -21,10 +22,16 @@ export function Settings() {
   const [savingLib, setSavingLib] = createSignal(false);
 
   const saveAnimelibToken = async () => {
+    const token = extractToken(libToken());
+    if (token.length === 0) {
+      pushToast("Пустой токен", "error");
+      return;
+    }
+
     setSavingLib(true);
     try {
-      await api.sourceConfigSet("animelib", { token: libToken().trim() });
-      await api.settingSet("animelib.token", libToken().trim());
+      await api.sourceConfigSet("animelib", { token });
+      await api.settingSet("animelib.token", token);
       setLibToken("");
       await refetchAnimelib();
       pushToast("Токен сохранён — свой плеер AnimeLib доступен", "success");
@@ -172,8 +179,10 @@ export function Settings() {
           инструменты разработчика, вкладка «Сеть», найти запрос к hapi.hentaicdn.org
           вида /api/episodes/… — обязательно строку с методом GET, а не OPTIONS,
           в предзапросе заголовков нет. В заголовках запроса взять Authorization
-          и скопировать всё после слова Bearer. Токен хранится только на этом
-          компьютере и уходит только в AnimeLib.
+          и скопировать всё после слова Bearer. Можно не выковыривать: правый клик
+          по запросу → «Копировать как cURL» и вставить сюда целиком, токен
+          вытащится сам. Хранится только на этом компьютере и уходит только
+          в AnimeLib.
         </p>
 
         <div class="field-inline">

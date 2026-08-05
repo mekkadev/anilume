@@ -64,3 +64,20 @@ export function fileSize(bytes: number): string {
 export function truncate(text: string, limit: number) {
   return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
 }
+
+export function extractToken(pasted: string) {
+  const text = pasted.trim();
+  if (text.length === 0) return "";
+
+  const fromHeader = text.match(
+    /authorization["'\s:]*\s*(?:bearer\s+)?([A-Za-z0-9._~+/=-]{20,})/i,
+  );
+  if (fromHeader) return fromHeader[1]!;
+
+  const bare = text.replace(/^bearer\s+/i, "").trim();
+  const single = bare.match(/^([A-Za-z0-9._~+/=-]{20,})$/);
+  if (single) return single[1]!;
+
+  const anyJwt = text.match(/\beyJ[A-Za-z0-9._~+/=-]{20,}/);
+  return anyJwt ? anyJwt[0] : bare;
+}

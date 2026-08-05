@@ -221,8 +221,9 @@ Range-запросы проходят насквозь, потому что от
 вкладка network, запрос к hapi.hentaicdn.org вида `/api/episodes/…` — именно
 строка с методом GET, а не OPTIONS: предзапрос заголовков не несёт, он лишь
 объявляет, что `Authorization` будет отправлен. В заголовках запроса взять
-`Authorization` и скопировать всё после слова `Bearer`. Вставить в настройки.
-Аккаунт бесплатный. Он хранится в локальной базе SQLite на твоей машине
+`Authorization` и скопировать всё после слова `Bearer`. Вставить в настройки —
+или не выковыривать вовсе: правый клик по запросу, «Копировать как cURL»,
+вставить целиком, приложение достанет токен само. Аккаунт бесплатный. Он хранится в локальной базе SQLite на твоей машине
 и уходит только в AnimeLib. Без него приложение работает.
 
 Опубликовано три CDN-сервера, и отвечают они не все и не всегда, поэтому рядом
@@ -541,8 +542,9 @@ the token lives in your browser on v5.animelib.org: sign in, open any episode,
 devtools, network tab, the request to hapi.hentaicdn.org that looks like
 `/api/episodes/…` — the GET row, not the OPTIONS one: a preflight carries no
 headers, it only announces that `Authorization` will be sent. take the
-`Authorization` header minus the word `Bearer` and paste it into settings. the
-account is free. it is stored in the local sqlite database on
+`Authorization` header minus the word `Bearer` and paste it into settings — or
+skip the digging: right-click the request, "copy as cURL", paste the whole thing
+and the app will pull the token out of it. the account is free. it is stored in the local sqlite database on
 your machine and sent to animelib and nowhere else. the app works without it.
 
 three cdn servers are published; they do not all answer at any given moment, so
