@@ -16,7 +16,8 @@ from .sources import DEFAULT_SOURCE, SOURCES, SOURCES_BY_KEY, ExtractorPool
 
 log = logging.getLogger("anilume.service")
 
-UPSTREAM_TIMEOUT = 30.0
+UPSTREAM_TIMEOUT = 12.0
+PROBE_TIMEOUT = 20.0
 
 def _require(params: dict[str, Any], name: str) -> Any:
     value = params.get(name)
@@ -127,39 +128,45 @@ class AnilumeService:
         if not isinstance(requested, list):
             raise RpcError(INVALID_PARAMS, "Параметр «items» должен быть списком")
 
+        async def measure(result: dict[str, Any], record: Any) -> None:
+            source_key = record.source_key
+            anime = await _call(source_key, "anime", record.obj.a_get_anime())
+            episodes = await _call(source_key, "episodes", anime.a_get_episodes())
+            result["episodes"] = len(episodes)
+            if not episodes:
+                return
+
+            studios = await _call(source_key, "sources", episodes[0].a_get_sources())
+            result["dubs"] = len(studios)
+            if not studios:
+                return
+
+            videos = await _call(source_key, "videos", studios[0].a_get_videos())
+            qualities = [int(getattr(v, "quality", 0) or 0) for v in videos]
+            result["quality"] = max(qualities) if qualities else None
+
         async def probe(entry: Any) -> dict[str, Any]:
             if not isinstance(entry, dict):
                 raise RpcError(INVALID_PARAMS, "Каждый элемент должен быть объектом")
 
             handle = str(_require(entry, "handle"))
-            record = self.handles.get(handle)
-            source_key = record.source_key
+            record = self.handles.peek(handle)
             result: dict[str, Any] = {
-                "source": source_key,
+                "source": record.source_key if record else entry.get("source"),
                 "handle": handle,
                 "quality": None,
                 "dubs": 0,
                 "episodes": 0,
                 "error": None,
             }
+            if record is None:
+                result["error"] = "карточка устарела"
+                return result
 
             try:
-                anime = await _call(source_key, "anime", record.obj.a_get_anime())
-                episodes = await _call(source_key, "episodes", anime.a_get_episodes())
-                result["episodes"] = len(episodes)
-                if not episodes:
-                    return result
-
-                studios = await _call(
-                    source_key, "sources", episodes[0].a_get_sources()
-                )
-                result["dubs"] = len(studios)
-                if not studios:
-                    return result
-
-                videos = await _call(source_key, "videos", studios[0].a_get_videos())
-                qualities = [int(getattr(v, "quality", 0) or 0) for v in videos]
-                result["quality"] = max(qualities) if qualities else None
+                await asyncio.wait_for(measure(result, record), timeout=PROBE_TIMEOUT)
+            except asyncio.TimeoutError:
+                result["error"] = "источник не ответил вовремя"
             except RpcError as exc:
                 result["error"] = exc.message
             except Exception as exc:

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -6,6 +7,23 @@ use tokio::sync::Mutex;
 use crate::error::{CoreError, Result};
 
 pub const CATALOG_BASE: &str = "https://shikimori.one";
+
+const MIRRORS: [&str; 3] = [
+    "https://shikimori.one",
+    "https://shikimori.io",
+    "https://shikimori.me",
+];
+
+static MIRROR: AtomicUsize = AtomicUsize::new(0);
+
+pub fn catalog_base() -> &'static str {
+    MIRRORS[MIRROR.load(Ordering::Relaxed) % MIRRORS.len()]
+}
+
+fn next_mirror() -> &'static str {
+    let index = MIRROR.fetch_add(1, Ordering::Relaxed) + 1;
+    MIRRORS[index % MIRRORS.len()]
+}
 
 const MIN_REQUEST_GAP: Duration = Duration::from_millis(240);
 const WINDOW: Duration = Duration::from_secs(60);
@@ -338,7 +356,7 @@ fn absolute(path: &str) -> String {
     if path.starts_with("http://") || path.starts_with("https://") {
         path.to_owned()
     } else {
-        format!("{CATALOG_BASE}{path}")
+        format!("{}{path}", catalog_base())
     }
 }
 
@@ -557,7 +575,8 @@ impl Discover {
     pub fn new() -> Result<Self> {
         Ok(Self {
             http: reqwest::Client::builder()
-                .timeout(Duration::from_secs(20))
+                .timeout(Duration::from_secs(12))
+                .connect_timeout(Duration::from_secs(6))
                 .build()?,
             throttle: Mutex::new(Vec::new()),
             options: Mutex::new(None),
@@ -697,25 +716,35 @@ impl Discover {
 
             let sent = self
                 .http
-                .get(format!("{CATALOG_BASE}{path}"))
+                .get(format!("{}{path}", catalog_base()))
                 .query(params)
                 .header(reqwest::header::USER_AGENT, "anilume")
                 .header(reqwest::header::ACCEPT, "application/json")
                 .send()
                 .await;
 
-            match sent {
-                Ok(response) if response.status() != reqwest::StatusCode::TOO_MANY_REQUESTS => {
-                    break response
-                }
-                other => {
-                    attempt += 1;
-                    if attempt >= RETRIES {
-                        break other?;
-                    }
-                    tokio::time::sleep(RETRY_BACKOFF * attempt as u32).await;
-                }
+            let throttled = matches!(
+                &sent,
+                Ok(response) if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
+            );
+            let unreachable = match &sent {
+                Ok(response) => response.status().is_server_error(),
+                Err(_) => true,
+            };
+
+            if !throttled && !unreachable {
+                break sent?;
             }
+
+            attempt += 1;
+            if attempt >= RETRIES {
+                break sent?;
+            }
+            if unreachable {
+                let host = next_mirror();
+                tracing::warn!(target: "discover", "переключаюсь на зеркало {host}");
+            }
+            tokio::time::sleep(RETRY_BACKOFF * attempt as u32).await;
         };
 
         let status = response.status();
@@ -1055,5 +1084,11 @@ mod tests {
     fn a_poster_that_is_already_absolute_is_left_alone() {
         assert_eq!(absolute("https://cdn.example/a.jpg"), "https://cdn.example/a.jpg");
         assert_eq!(absolute("/a.jpg"), format!("{CATALOG_BASE}/a.jpg"));
+    }
+
+    #[test]
+    fn mirrors_start_at_the_documented_host() {
+        assert_eq!(MIRRORS[0], CATALOG_BASE);
+        assert!(MIRRORS.iter().all(|host| host.starts_with("https://")));
     }
 }

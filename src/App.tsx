@@ -1,4 +1,5 @@
 import {
+  ErrorBoundary,
   Match,
   Show,
   Switch,
@@ -142,38 +143,44 @@ export function App() {
               </button>
             </Show>
 
-            <Switch>
-              <Match when={matchRoute(route(), "home")}>
-                <Home />
-              </Match>
-              <Match when={matchRoute(route(), "search")}>
-                {(current) => <Search query={current().query} />}
-              </Match>
-              <Match when={matchRoute(route(), "discover")}>
-                <Discover />
-              </Match>
-              <Match when={matchRoute(route(), "title")}>
-                {(current) => (
-                  <Title
-                    query={current().query}
-                    card={current().card}
-                    source={current().source}
-                  />
-                )}
-              </Match>
-              <Match when={matchRoute(route(), "library")}>
-                <Library />
-              </Match>
-              <Match when={matchRoute(route(), "history")}>
-                <History />
-              </Match>
-              <Match when={matchRoute(route(), "downloads")}>
-                <Downloads />
-              </Match>
-              <Match when={matchRoute(route(), "settings")}>
-                <Settings />
-              </Match>
-            </Switch>
+            <ErrorBoundary fallback={(error, reset) => <Crash error={error} reset={reset} />}>
+              <Switch>
+                <Match when={matchRoute(route(), "home")}>
+                  <Home />
+                </Match>
+                <Match when={matchRoute(route(), "search")}>
+                  {(current) => <Search query={current().query} />}
+                </Match>
+                <Match when={matchRoute(route(), "discover")}>
+                  <Discover />
+                </Match>
+                <Match when={matchRoute(route(), "title")}>
+                  {(current) => (
+                    <Show when={current()} keyed>
+                      {(target) => (
+                        <Title
+                          query={target.query}
+                          card={target.card}
+                          source={target.source}
+                        />
+                      )}
+                    </Show>
+                  )}
+                </Match>
+                <Match when={matchRoute(route(), "library")}>
+                  <Library />
+                </Match>
+                <Match when={matchRoute(route(), "history")}>
+                  <History />
+                </Match>
+                <Match when={matchRoute(route(), "downloads")}>
+                  <Downloads />
+                </Match>
+                <Match when={matchRoute(route(), "settings")}>
+                  <Settings />
+                </Match>
+              </Switch>
+            </ErrorBoundary>
           </div>
         </div>
       </div>
@@ -183,6 +190,35 @@ export function App() {
       </Show>
 
       <Toasts />
+    </div>
+  );
+}
+
+function Crash(props: { error: unknown; reset: () => void }) {
+  const message = () => {
+    const error = props.error;
+    if (error instanceof Error) return error.message;
+    return String(error);
+  };
+
+  return (
+    <div class="empty">
+      <div class="empty__title">Страница не открылась</div>
+      <p>{message()}</p>
+      <div class="empty__actions">
+        <button
+          class="btn btn--primary"
+          onClick={() => {
+            navigate({ name: "home" });
+            props.reset();
+          }}
+        >
+          На главную
+        </button>
+        <button class="btn" onClick={props.reset}>
+          Повторить
+        </button>
+      </div>
     </div>
   );
 }

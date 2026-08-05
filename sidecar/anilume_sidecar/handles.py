@@ -6,7 +6,7 @@ from typing import Any, NamedTuple
 
 from .protocol import HandleExpired
 
-DEFAULT_CAPACITY = 512
+DEFAULT_CAPACITY = 2048
 
 class Entry(NamedTuple):
     kind: str
@@ -38,6 +38,9 @@ class HandleRegistry:
 
         self._entries.move_to_end(handle)
         return entry
+
+    def peek(self, handle: str) -> Entry | None:
+        return self._entries.get(handle)
 
     def __len__(self) -> int:
         return len(self._entries)

@@ -6,6 +6,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
+  untrack,
 } from "solid-js";
 
 import { Icon } from "../components/Icon";
@@ -29,6 +30,7 @@ import {
   setRememberDub,
 } from "../lib/prefs";
 import {
+  activeSource,
   navigate,
   openPlayer,
   pushToast,
@@ -77,29 +79,65 @@ function pickBest(items: AnimeCard[], query: string) {
 }
 
 export function Title(props: { query: string; card?: AnimeCard; source?: string }) {
+  const [candidates, setCandidates] = createSignal<Record<string, AnimeCard>>({});
   const [chosen, setChosen] = createSignal<string | null>(null);
+  const [pinned, setPinned] = createSignal(false);
   const [probes, setProbes] = createSignal<Record<string, SourceProbe>>({});
   const [probing, setProbing] = createSignal(false);
+  const [scanning, setScanning] = createSignal(false);
+  const [scanned, setScanned] = createSignal(false);
+  const [missing, setMissing] = createSignal(false);
 
-  const [candidates] = createResource(
+  const remember = (card: AnimeCard) =>
+    setCandidates((current) =>
+      current[card.source] ? current : { ...current, [card.source]: card },
+    );
+
+  const [primary] = createResource(
     () => props.query,
     async (query) => {
-      const keys = sources().map((item) => item.key);
-      const result = await api.searchMulti(keys, query);
-
-      const found: Record<string, AnimeCard> = {};
-      for (const group of result.groups) {
-        const best = pickBest(group.items, query);
-        if (best) found[group.source] = best;
+      const known = props.card;
+      if (known) {
+        remember(known);
+        return known;
       }
-      if (props.card) found[source()] = props.card;
-      return found;
+
+      const stored = await api
+        .settingGet(sourceSettingKey(query))
+        .catch(() => null);
+
+      const order = [stored, props.source, activeSource()].filter(
+        (key): key is string => Boolean(key),
+      );
+      const tried = new Set<string>();
+
+      for (const key of order) {
+        if (tried.has(key)) continue;
+        tried.add(key);
+        const found = await api
+          .search(key, query)
+          .then((result) => pickBest(result.items, query))
+          .catch(() => null);
+        if (found) {
+          remember(found);
+          return found;
+        }
+      }
+
+      return null;
     },
   );
 
+  createEffect(() => {
+    if (primary.state !== "ready") return;
+    const found = primary();
+    if (found && !chosen()) setChosen(found.source);
+    if (!found) setMissing(true);
+  });
+
   const available = () => {
     const order = new Map(sources().map((item) => [item.key, item.priority ?? 50]));
-    return Object.values(candidates() ?? {}).sort((a, b) => {
+    return Object.values(candidates()).sort((a, b) => {
       const qa = probes()[a.source]?.quality ?? 0;
       const qb = probes()[b.source]?.quality ?? 0;
       if (qa !== qb) return qb - qa;
@@ -107,61 +145,74 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     });
   };
 
-  createEffect(() => {
-    const found = candidates();
-    if (!found || Object.keys(found).length === 0) return;
+  const scanOthers = async () => {
+    if (scanning() || scanned()) return;
+    setScanning(true);
+    try {
+      const rest = sources()
+        .map((item) => item.key)
+        .filter((key) => !candidates()[key]);
+      if (rest.length === 0) return;
 
-    void (async () => {
+      const result = await api.searchMulti(rest, props.query);
+      const merged = { ...candidates() };
+      for (const group of result.groups) {
+        const best = pickBest(group.items, props.query);
+        if (best) merged[group.source] = best;
+      }
+      setCandidates(merged);
+      setScanned(true);
+
+      const pending = Object.values(merged).filter(
+        (card) => !probes()[card.source],
+      );
+      if (pending.length === 0) return;
+
       setProbing(true);
       try {
         const { probes: measured } = await api.catalogProbe(
-          Object.values(found).map((card) => ({ handle: card.handle })),
+          pending.map((card) => ({ handle: card.handle })),
         );
-        const table: Record<string, SourceProbe> = {};
-        for (const probe of measured) table[probe.source] = probe;
+        const table = { ...probes() };
+        for (const probe of measured) {
+          if (probe.source) table[probe.source] = probe;
+        }
         setProbes(table);
-      } catch {
-        setProbes({});
       } finally {
         setProbing(false);
       }
-    })();
-  });
+    } catch {
+      setScanned(true);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   createEffect(() => {
-    const found = candidates();
-    if (!found || chosen()) return;
+    if (probing() || pinned() || !chosen()) return;
+    if (Object.keys(probes()).length === 0) return;
 
-    void (async () => {
-      const remembered = await api
-        .settingGet(sourceSettingKey(props.query))
-        .catch(() => null);
-
-      const preferred =
-        (remembered && found[remembered] ? remembered : null) ??
-        (props.card ? source() : null) ??
-        (props.source && found[props.source] ? props.source : null);
-
-      setChosen(preferred ?? available()[0]?.source ?? null);
-    })();
-  });
-
-  createEffect(() => {
-    if (probing() || !chosen() || Object.keys(probes()).length === 0) return;
+    const current = probes()[chosen()!];
     const best = available()[0];
     if (!best || best.source === chosen()) return;
-    if ((probes()[best.source]?.quality ?? 0) <= (probes()[chosen()!]?.quality ?? 0)) return;
+    if ((probes()[best.source]?.quality ?? 0) <= (current?.quality ?? 0)) return;
+
     setChosen(best.source);
+    void api
+      .settingSet(sourceSettingKey(props.query), best.source)
+      .catch(() => undefined);
   });
 
   const active = () => {
     const key = chosen();
-    return key ? (candidates()?.[key] ?? null) : null;
+    return key ? (candidates()[key] ?? null) : null;
   };
   const source = () => active()?.source ?? "";
   const animeKey = () => active()?.key ?? "";
 
   const chooseSource = (key: string) => {
+    if (key === chosen()) return;
+    setPinned(true);
     setChosen(key);
     void api.settingSet(sourceSettingKey(props.query), key).catch(() => undefined);
   };
@@ -172,13 +223,23 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
   );
   const detail = () => (detailRes.state === "ready" ? detailRes() : undefined);
 
+  const settled = () =>
+    missing() || detailRes.state === "ready" || detailRes.state === "errored";
+
+  createEffect(() => {
+    if (!settled()) return;
+    untrack(() => void scanOthers());
+  });
+
+  const target = () => (active() ? ([source(), animeKey()] as const) : null);
+
   const [progressRes, { refetch: refetchProgress }] = createResource(
-    () => [source(), animeKey()] as const,
+    target,
     ([source, key]) => api.animeProgress(source, key),
   );
 
   const [libraryRes, { refetch: refetchLibrary }] = createResource(
-    () => [source(), animeKey()] as const,
+    target,
     ([source, key]) => api.libraryGet(source, key),
   );
 
@@ -193,6 +254,8 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
       return id ? await api.discoverTitle(id) : null;
     },
   );
+
+  const shiki = () => (shikiRes.state === "ready" ? shikiRes() : null);
 
   const [relatedRes] = createResource(
     () => shiki()?.id ?? null,
@@ -209,7 +272,6 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     (topicId) => api.discoverComments(topicId, 15),
   );
 
-  const shiki = () => (shikiRes.state === "ready" ? shikiRes() : null);
   const related = () => (relatedRes.state === "ready" ? relatedRes() : undefined);
   const similar = () => (similarRes.state === "ready" ? similarRes() : undefined);
   const comments = () => (commentsRes.state === "ready" ? commentsRes() : undefined);
@@ -536,7 +598,31 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
 
   return (
     <div class="fade-in">
-      <Show when={detail()} fallback={<TitleSkeleton />}>
+      <Show
+        when={detail()}
+        fallback={
+          <Show
+            when={settled() && scanned() && available().length === 0}
+            fallback={<TitleSkeleton />}
+          >
+            <div class="empty">
+              <div class="empty__title">
+                Ни один источник не нашёл «{props.query}»
+              </div>
+              <p>
+                Попробуйте оригинальное или английское название — источники
+                часто хранят тайтл именно под ним.
+              </p>
+              <button
+                class="btn btn--primary"
+                onClick={() => navigate({ name: "search", query: props.query })}
+              >
+                Открыть поиск
+              </button>
+            </div>
+          </Show>
+        }
+      >
         {(info) => (
           <>
             <section class="title-hero">
@@ -637,10 +723,10 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                   <div class="picker">
                     <div class="picker__head">
                       <span class="fact__label">Где смотреть</span>
-                      <Show when={probing()}>
+                      <Show when={scanning() || probing()}>
                         <span class="picker__probing">
                           <span class="spinner" />
-                          проверяем качество
+                          {probing() ? "проверяем качество" : "ищем в других источниках"}
                         </span>
                       </Show>
                     </div>
