@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 import type {
   AnimeCard,
+  Artwork,
   AnimeDetail,
   AppError,
   ContinueItem,
@@ -88,6 +89,8 @@ export const api = {
 
   discoverSearch: (query: DiscoverQuery) =>
     call<DiscoverCard[]>("discover_search", { query }),
+
+  artworkLookup: (ids: number[]) => call<Artwork[]>("artwork_lookup", { ids }),
 
   discoverTitle: (id: number) => call<TitleDetail>("discover_title", { id }),
 

@@ -14,6 +14,7 @@ import { PosterSkeleton } from "../components/PosterCard";
 import { ShikiCard } from "../components/ShikiCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { ensureArt } from "../lib/art";
 import { navigate, reportError } from "../lib/store";
 import type { DiscoverCard, DiscoverNamed, DiscoverOptions } from "../lib/types";
 
@@ -174,6 +175,7 @@ export function Discover() {
       page = next;
       setExhausted(found.length === 0);
       setItems(append ? [...items(), ...found] : found);
+      void ensureArt(found.map((card) => card.id));
     } catch (error) {
       if (!append) setItems([]);
       reportError(error);

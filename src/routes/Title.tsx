@@ -12,6 +12,7 @@ import { Icon } from "../components/Icon";
 import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
+import { bannerFor, coverFor, ensureArt } from "../lib/art";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
 import {
   QUALITY_LABELS,
@@ -207,7 +208,20 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     (topicId) => api.discoverComments(topicId, 15),
   );
 
-  createEffect(() => setAmbient(shiki()?.art[0] ?? detail()?.poster ?? null));
+  const heroArt = () => shiki()?.art[0] ?? bannerFor(shiki()?.id) ?? null;
+  const poster = () =>
+    coverFor(shiki()?.id, shiki()?.poster ?? detail()?.poster ?? null);
+
+  createEffect(() => {
+    const ids = [
+      shiki()?.id,
+      ...(similar() ?? []).map((card) => card.id),
+      ...(related() ?? []).map((entry) => entry.card.id),
+    ];
+    if (ids.some(Boolean)) void ensureArt(ids);
+  });
+
+  createEffect(() => setAmbient(heroArt() ?? poster()));
   onCleanup(() => setAmbient(null));
 
   const openShiki = (card: DiscoverCard) =>
@@ -519,16 +533,16 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
           <>
             <section class="title-hero">
               <div class="title-hero__art">
-                <Show when={shiki()?.art[0]}>
-                  <img src={shiki()!.art[0]} alt="" decoding="async" />
+                <Show when={heroArt()}>
+                  <img src={heroArt()!} alt="" decoding="async" />
                 </Show>
               </div>
               <div class="title-hero__fade" />
 
               <div class="title-hero__grid">
                 <div class="title-poster">
-                  <Show when={info().poster} fallback={<div class="skeleton" />}>
-                    <img src={info().poster!} alt={info().title} decoding="async" />
+                  <Show when={poster()} fallback={<div class="skeleton" />}>
+                    <img src={poster()!} alt={info().title} decoding="async" />
                   </Show>
                 </div>
 
@@ -852,9 +866,9 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                         onClick={() => openShiki(entry.card)}
                       >
                         <div class="season-card__art">
-                          <Show when={entry.card.poster}>
+                          <Show when={coverFor(entry.card.id, entry.card.poster)}>
                             <img
-                              src={entry.card.poster!}
+                              src={coverFor(entry.card.id, entry.card.poster)!}
                               alt=""
                               loading="lazy"
                               decoding="async"

@@ -1,3 +1,4 @@
+pub mod artwork;
 pub mod db;
 pub mod discover;
 pub mod downloads;
@@ -6,6 +7,7 @@ pub mod proxy;
 pub mod shikimori;
 pub mod sidecar;
 
+pub use artwork::{Artwork, Artworks};
 pub use db::{ContinueItem, Db, LibraryEntry, WatchProgress};
 pub use discover::{Discover, DiscoverCard, DiscoverOptions, DiscoverQuery};
 pub use downloads::{DownloadEvent, DownloadItem, DownloadManager, DownloadRequest};

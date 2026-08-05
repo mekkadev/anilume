@@ -1,5 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 
+import { coverFor } from "../lib/art";
 import type { DiscoverCard } from "../lib/types";
 import { Icon } from "./Icon";
 
@@ -37,6 +38,7 @@ export function ShikiCard(props: {
   onOpen: (card: DiscoverCard) => void;
 }) {
   const [loaded, setLoaded] = createSignal(false);
+  const poster = () => coverFor(props.card.id, props.card.poster);
 
   const summary = () => {
     const parts: string[] = [];
@@ -51,12 +53,9 @@ export function ShikiCard(props: {
   return (
     <button class="card" onClick={() => props.onOpen(props.card)}>
       <div class="card__art">
-        <Show
-          when={props.card.poster}
-          fallback={<div class="skeleton" style={{ height: "100%" }} />}
-        >
+        <Show when={poster()} fallback={<div class="skeleton" style={{ height: "100%" }} />}>
           <img
-            src={props.card.poster!}
+            src={poster()!}
             alt={props.card.title}
             loading="lazy"
             decoding="async"

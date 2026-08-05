@@ -264,3 +264,9 @@ export interface ShikiComment {
   body: string;
   createdAt: string;
 }
+
+export interface Artwork {
+  malId: number;
+  cover: string | null;
+  banner: string | null;
+}

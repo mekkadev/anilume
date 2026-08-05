@@ -13,6 +13,7 @@ import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
+import { bannerFor, coverFor, ensureArt } from "../lib/art";
 import { formatTime, relativeTime } from "../lib/format";
 import { activeSource, navigate, setAmbient, sourceName } from "../lib/store";
 import type { AnimeCard, ContinueItem, DiscoverCard } from "../lib/types";
@@ -46,6 +47,16 @@ export function Home() {
   );
 
 
+  createEffect(() => {
+    const ids = [
+      ...(popular() ?? []),
+      ...(fresh() ?? []),
+      ...(best() ?? []),
+      ...(forYou()?.items ?? []),
+    ].map((card) => card.id);
+    if (ids.length > 0) void ensureArt(ids);
+  });
+
   const heroes = () => (popular() ?? []).slice(0, HERO_COUNT);
   const [heroIndex, setHeroIndex] = createSignal(0);
   const [details, setDetails] = createSignal<Record<number, HeroDetail>>({});
@@ -54,6 +65,12 @@ export function Home() {
   const heroDetail = () => {
     const current = hero();
     return current ? (details()[current.id] ?? null) : null;
+  };
+
+  const heroArt = () => {
+    const current = hero();
+    if (!current) return null;
+    return heroDetail()?.art[0] ?? bannerFor(current.id) ?? null;
   };
 
   const loadDetail = async (card: DiscoverCard) => {
@@ -83,7 +100,7 @@ export function Home() {
     void loadDetail(current);
     const next = heroes()[heroIndex() + 1];
     if (next) void loadDetail(next);
-    setAmbient(heroDetail()?.art[0] ?? current.poster);
+    setAmbient(heroArt() ?? coverFor(current.id, current.poster));
   });
 
   onMount(() => {
@@ -110,9 +127,16 @@ export function Home() {
       <Show when={hero()} fallback={<div class="hero hero--empty" />}>
         {(current) => (
           <section class="hero">
-            <div class="hero__art">
-              <Show when={heroDetail()?.art[0] ?? current().poster}>
-                <HeroArt src={(heroDetail()?.art[0] ?? current().poster)!} />
+            <div class="hero__art" data-fallback={!heroArt()}>
+              <Show
+                when={heroArt()}
+                fallback={
+                  <Show when={coverFor(current().id, current().poster)}>
+                    <HeroArt src={coverFor(current().id, current().poster)!} />
+                  </Show>
+                }
+              >
+                <HeroArt src={heroArt()!} />
               </Show>
             </div>
             <div class="hero__fade" />

@@ -93,6 +93,23 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 Запросы идут не чаще одного в 240 мс, чтобы не упереться в лимит Shikimori,
 а списки жанров и студий тянутся один раз за запуск и держатся в памяти.
 
+## откуда обложки
+
+Постеры Shikimori — 225×350. Этого хватает на список, но не на карточку в сетке
+на ретине и совсем не хватает на большой арт: растянутый постер выглядит как
+240p, потому что это и есть 240p.
+
+Поэтому обложки берутся из [AniList](https://anilist.co): `extraLarge` — 460×636,
+вдвое больше по каждой стороне. Сопоставление идёт по id MyAnimeList, а у аниме
+id Shikimori и MAL совпадают, так что промежуточного поиска не нужно. Один запрос
+отдаёт до пятидесяти тайтлов сразу, ответы кешируются в памяти на всё время
+работы, запросы разведены на 800 мс.
+
+Широкий арт для героя на главной и шапки страницы аниме — это кадры Shikimori
+(1920×1080), а если их нет, баннер AniList (1900×400). Когда нет ни того ни
+другого, вместо растянутого постера показывается он же, но размытый: честнее
+признать, что большой картинки нет, чем выдать мыло за неё.
+
 ## интерфейс
 
 Одно окно без хрома. Слева плавающий стеклянный рельс с шестью разделами,
@@ -239,7 +256,7 @@ npm run app:build        # бандл
 
 ```bash
 pytest                          # 55 тестов сайдкара, без сети
-cargo test -p anilume-core      # 78 тестов ядра, включая живой прокси
+cargo test -p anilume-core      # 86 тестов ядра, включая живой прокси
 npm run typecheck
 python scripts/design_lint.py   # правила оформления
 ```
@@ -275,7 +292,8 @@ Rust-ядро вынесено в отдельный крейт от Tauri-об�
 
 ## стек
 
-Rust, Tauri 2, SolidJS, Python, hls.js, SQLite, ffmpeg, иконки [Lucide](https://lucide.dev).
+Rust, Tauri 2, SolidJS, Python, hls.js, SQLite, ffmpeg, иконки [Lucide](https://lucide.dev),
+метаданные [Shikimori](https://shikimori.one), обложки [AniList](https://anilist.co).
 
 Solid, а не React, потому что каталог — это длинная лента картинок, и
 точечные обновления выигрывают у мемоизации дерева. hls.js грузится по
@@ -365,6 +383,22 @@ its seasons, what else is like it, and the discussion under it. a title opened
 from a source is matched back to shikimori by name and year when the source did
 not hand over an id. requests are paced to one every 240ms to stay inside
 shikimori's rate limit.
+
+## where the art comes from
+
+shikimori posters are 225×350. that is fine in a list, not on a retina grid card,
+and hopeless as a hero image — a stretched poster looks like 240p because it is.
+
+so covers come from [anilist](https://anilist.co): `extraLarge` is 460×636, twice
+the size on each side. matching is by myanimelist id, and for anime the shikimori
+and mal ids are the same, so no intermediate search is needed. one request covers
+fifty titles, answers are cached in memory for the session, and requests are
+spaced 800ms apart.
+
+the wide art behind the home hero and the title page header is a shikimori
+screenshot (1920×1080), or an anilist banner (1900×400) when there is none. with
+neither, the poster is shown blurred rather than stretched — better to admit
+there is no big image than to pass mush off as one.
 
 ## the interface
 
@@ -506,7 +540,7 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 55, sidecar, no network
-cargo test -p anilume-core      # 78, includes a real proxy round-trip
+cargo test -p anilume-core      # 86, includes a real proxy round-trip
 npm run typecheck
 python scripts/design_lint.py
 ```
@@ -538,7 +572,8 @@ anywhere including a bare ci container.
 
 ## stack
 
-rust, tauri 2, solidjs, python, hls.js, sqlite, ffmpeg, [lucide](https://lucide.dev) icons.
+rust, tauri 2, solidjs, python, hls.js, sqlite, ffmpeg, [lucide](https://lucide.dev) icons,
+[shikimori](https://shikimori.one) metadata, [anilist](https://anilist.co) artwork.
 
 solid rather than react because the catalogue is a long scroll of images and
 fine-grained updates beat memoising a tree into behaving. hls.js loads on demand

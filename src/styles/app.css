@@ -41,6 +41,7 @@
 
 .rail {
   position: relative;
+  z-index: 30;
   padding: 62px var(--rail-gap) var(--rail-gap);
   -webkit-app-region: drag;
   app-region: drag;
@@ -1081,4 +1082,9 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
+}
+
+.hero__art[data-fallback="true"] img {
+  filter: blur(26px) saturate(150%);
+  transform: scale(1.16);
 }

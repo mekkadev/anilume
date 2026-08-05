@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anilume_core::{
-    CoreError, Db, Discover, DownloadManager, ProxyHandle, Result, Shikimori, SidecarClient,
-    SidecarSpec,
+    Artworks, CoreError, Db, Discover, DownloadManager, ProxyHandle, Result, Shikimori,
+    SidecarClient, SidecarSpec,
 };
 use tokio::sync::Mutex;
 
@@ -13,6 +13,7 @@ pub struct AppState {
     pub db: Arc<Db>,
     pub shikimori: Arc<Shikimori>,
     pub discover: Arc<Discover>,
+    pub artworks: Arc<Artworks>,
     pub downloads: Arc<DownloadManager>,
     pub playback_session: Mutex<Option<String>>,
 }
@@ -24,6 +25,7 @@ impl AppState {
         let proxy = ProxyHandle::start().await?;
         let shikimori = Arc::new(Shikimori::new(db.clone())?);
         let discover = Arc::new(Discover::new()?);
+        let artworks = Arc::new(Artworks::new()?);
         let downloads = Arc::new(DownloadManager::new(
             db.clone(),
             resolve_ffmpeg(),
@@ -36,6 +38,7 @@ impl AppState {
             db,
             shikimori,
             discover,
+            artworks,
             downloads,
             playback_session: Mutex::new(None),
         })

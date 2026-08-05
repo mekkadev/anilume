@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anilume_core::error::CoreErrorWire;
 use anilume_core::discover::{Comment, RelatedTitle, TitleDetail};
 use anilume_core::{
+    Artwork,
     ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
     LibraryEntry, WatchProgress,
 };
@@ -129,6 +130,14 @@ pub async fn discover_search(
     query: DiscoverQuery,
 ) -> Answer<Vec<DiscoverCard>> {
     Ok(state.discover.search(&query).await?)
+}
+
+#[tauri::command]
+pub async fn artwork_lookup(
+    state: State<'_, AppState>,
+    ids: Vec<i64>,
+) -> Answer<Vec<Artwork>> {
+    Ok(state.artworks.lookup(&ids).await?)
 }
 
 #[tauri::command]

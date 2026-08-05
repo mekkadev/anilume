@@ -78,6 +78,7 @@ pub fn run() {
             commands::discover_options,
             commands::discover_search,
             commands::discover_title,
+            commands::artwork_lookup,
             commands::discover_similar,
             commands::discover_related,
             commands::discover_comments,
