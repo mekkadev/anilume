@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use anilume_core::error::CoreErrorWire;
 use anilume_core::{
-    ContinueItem, DownloadItem, DownloadRequest, LibraryEntry, WatchProgress,
+    ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
+    LibraryEntry, WatchProgress,
 };
 use anilume_core::shikimori::{Account, ShikimoriConfig, UserRate};
 use serde::Serialize;
@@ -106,6 +107,19 @@ pub async fn studio_videos(state: State<'_, AppState>, handle: String) -> Answer
         .sidecar
         .call("studio.videos", json!({ "handle": handle }))
         .await?)
+}
+
+#[tauri::command]
+pub async fn discover_options(state: State<'_, AppState>) -> Answer<DiscoverOptions> {
+    Ok(state.discover.options().await?)
+}
+
+#[tauri::command]
+pub async fn discover_search(
+    state: State<'_, AppState>,
+    query: DiscoverQuery,
+) -> Answer<Vec<DiscoverCard>> {
+    Ok(state.discover.search(&query).await?)
 }
 
 #[derive(Serialize)]

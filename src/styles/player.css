@@ -287,3 +287,16 @@
     transform: translateY(8px);
   }
 }
+
+.menu__list--tall {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.player .menu__item--muted {
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0 0 var(--r-xs) var(--r-xs);
+}

@@ -2,7 +2,7 @@
 
 a desktop anime client in russian, with its own player instead of someone else's iframe
 
-[install](#install) · [build it yourself](#build-it-yourself) · [why the player is ours](#why-the-player-is-ours) · [sources](#sources) · [shikimori](#shikimori) · [downloads](#downloads) · [limits](#limits) · [stack](#stack)
+[install](#install) · [build it yourself](#build-it-yourself) · [why the player is ours](#why-the-player-is-ours) · [what the player does](#what-the-player-does) · [sources](#sources) · [the catalogue](#the-catalogue) · [shikimori](#shikimori) · [downloads](#downloads) · [limits](#limits) · [stack](#stack)
 
 every russian anime site solves playback the same way: drop a kodik or alloha iframe on the page and let it own the experience. that is why they all feel identical, and why none of them can resume you at 14:32 of episode 7, remember which dub you picked, or hand you the file.
 
@@ -24,6 +24,27 @@ parts/seg-1.ts                              →  http://127.0.0.1:PORT/s/<sessio
 relative paths resolve against the playlist url before rewriting, or variant playlists would end up pointing at localhost. encryption keys, init maps and alternate audio tracks hide their url inside a `URI="…"` attribute, so those are rewritten in place with the rest of the tag left alone. range requests pass through, because seeking depends on them. the target url is base64 in the path and anything that is not http or https is refused, so the proxy cannot be talked into reading local files.
 
 sessions are uuids and die when the player closes. a stale link returns `410`, not video.
+
+## what the player does
+
+resume at the second you left off, dub switching without losing your position,
+quality switching that keeps it too, speeds from 0.25× to 3×, picture-in-picture,
+fullscreen, and skipping the opening where aniskip knows the timings.
+
+subtitles come from three places: the ones baked into an hls stream, the ones a
+source hands over as a separate track, and a `.srt` or `.vtt` file you open
+yourself from the tracks menu. srt is converted to vtt in the browser; ass is
+not supported, and the menu says so rather than failing silently.
+
+audio tracks work the same way — an hls stream with several of them switches
+inside the player, and where a source ships each dub as a separate stream
+instead (animelib, kodik), the dub picker does the same job in one click.
+
+decoding is the webview's: videotoolbox on macos, media foundation on windows,
+both hardware-accelerated for h.264 and hevc without anything to configure.
+that also fixes the format list — mp4 everywhere, webm on both, mkv on neither.
+no source serves mkv and downloads are remuxed to mp4, so this has not come up
+in practice, but it is a real limit rather than a missing feature.
 
 ## install
 
@@ -52,8 +73,8 @@ npm run app:build        # bundle
 ```
 
 ```bash
-pytest                          # 35, sidecar, no network
-cargo test -p anilume-core      # 65, includes a real proxy round-trip
+pytest                          # 51, sidecar, no network
+cargo test -p anilume-core      # 69, includes a real proxy round-trip
 npm run typecheck
 ```
 
@@ -75,6 +96,26 @@ ten catalogues. nine come from anicli-api; animelib is talked to directly. the p
 search runs against one source by default and against all nine on request, concurrently. a source that fails does not take the page down with it — it comes back in a separate list, and geo-blocked ones say so instead of showing a generic error.
 
 anicli-api objects are a stateful chain: episodes come off a live `Anime` object, which comes off a live `Search` object, and none of it is addressable by id. so the python sidecar keeps those objects in an lru and hands out string handles. when a handle is evicted you get `-32001` and the app quietly re-resolves the title by search. that is also why watch history and library store the source url rather than a handle — it is the only identifier that survives a restart.
+
+## the catalogue
+
+search by name is what a source can do. search by genre, year, studio and status
+is what none of them can — the animelib api takes genres, types and a year range
+but has no studio filter at all, and the anicli-api sources expose a search box
+and nothing else.
+
+so the catalogue page asks [shikimori](https://shikimori.one) instead: 46 genres,
+1910 studios, a year range, airing status, type, and five sort orders, all from
+its public api with no account needed. picking a title then searches for it by
+name in whichever source is selected in the sidebar and opens it there.
+
+that last step is the weak joint, and it is the same one history and the library
+already live with: names are matched, not ids. a title shikimori knows but the
+chosen source does not simply says so and suggests switching sources, which is
+honest but not the same as finding it.
+
+requests are paced to one every 240ms to stay inside shikimori's rate limit, and
+the genre and studio lists are fetched once per launch and kept in memory.
 
 ## the animelib token
 

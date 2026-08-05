@@ -6,6 +6,9 @@ import type {
   AnimeDetail,
   AppError,
   ContinueItem,
+  DiscoverCard,
+  DiscoverOptions,
+  DiscoverQuery,
   DownloadEvent,
   DownloadItem,
   DownloadRequest,
@@ -73,6 +76,11 @@ export const api = {
       selected: string;
       hasToken: boolean;
     }>("animelib_servers"),
+
+  discoverOptions: () => call<DiscoverOptions>("discover_options"),
+
+  discoverSearch: (query: DiscoverQuery) =>
+    call<DiscoverCard[]>("discover_search", { query }),
 
   studios: (handle: string) =>
     call<{ studios: StudioInfo[] }>("episode_studios", { handle }),

@@ -261,7 +261,6 @@ class Client:
         players = (data or {}).get("players") or []
 
         sources = [Source(self, player) for player in players]
-        # Свой плеер отдаёт прямой mp4 и качество до 4K, поэтому идёт первым.
         sources.sort(key=lambda item: 0 if item.player == "Animelib" else 1)
         return sources
 

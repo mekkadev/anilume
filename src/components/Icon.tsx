@@ -27,6 +27,9 @@ const PATHS = {
   external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
   clock: "M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18Zm0-14v5.2l3.5 2.1",
   subtitles: "M3 5.5h18v13H3zM6.5 11h5M14 11h3.5M6.5 14.5h3M12 14.5h5.5",
+  chevron: "M6 9.5 12 15.5l6-6",
+  sliders: "M4 7h9m3 0h4M4 17h4m3 0h9M14.5 7a1.75 1.75 0 1 1 3.5 0 1.75 1.75 0 0 1-3.5 0ZM6 17a1.75 1.75 0 1 1 3.5 0A1.75 1.75 0 0 1 6 17Z",
+  audio: "M4 9.5h3.5L12 5.5v13L7.5 14.5H4zM15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10",
 } as const;
 
 export type IconName = keyof typeof PATHS;
