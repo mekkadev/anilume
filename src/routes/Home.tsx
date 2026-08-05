@@ -9,6 +9,7 @@ import {
   onMount,
 } from "solid-js";
 
+import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
@@ -212,6 +213,13 @@ export function Home() {
       </Show>
 
       <Show when={broke(popularRes)}>
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Главная</h1>
+            <p class="page-sub">Что смотреть сегодня</p>
+          </div>
+        </div>
+
         <div class="empty">
           <div class="empty__title">Каталог Shikimori не отвечает</div>
           <p>
@@ -376,9 +384,7 @@ function ResumeCard(props: { item: ContinueItem; onOpen: () => void }) {
   return (
     <button class="resume" onClick={props.onOpen}>
       <div class="resume__art">
-        <Show when={props.item.poster}>
-          <img src={props.item.poster!} alt="" loading="lazy" decoding="async" />
-        </Show>
+        <Art src={props.item.poster} title={props.item.animeTitle} />
         <div class="resume__shade" />
         <div class="resume__play">
           <Icon name="play" size={18} />

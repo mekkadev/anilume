@@ -1,7 +1,8 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 
 import { coverFor } from "../lib/art";
 import type { DiscoverCard } from "../lib/types";
+import { Art } from "./Art";
 import { Icon } from "./Icon";
 
 export const KIND_LABELS: Record<string, string> = {
@@ -37,7 +38,6 @@ export function ShikiCard(props: {
   busy?: boolean;
   onOpen: (card: DiscoverCard) => void;
 }) {
-  const [loaded, setLoaded] = createSignal(false);
   const poster = () => coverFor(props.card.id, props.card.poster);
 
   const summary = () => {
@@ -53,17 +53,7 @@ export function ShikiCard(props: {
   return (
     <button class="card" onClick={() => props.onOpen(props.card)}>
       <div class="card__art">
-        <Show when={poster()} fallback={<div class="skeleton" style={{ height: "100%" }} />}>
-          <img
-            src={poster()!}
-            alt={props.card.title}
-            loading="lazy"
-            decoding="async"
-            data-loaded={loaded()}
-            onLoad={() => setLoaded(true)}
-            onError={() => setLoaded(true)}
-          />
-        </Show>
+        <Art src={poster()} title={props.card.title} />
 
         <div class="card__scrim" />
         <div class="card__play">

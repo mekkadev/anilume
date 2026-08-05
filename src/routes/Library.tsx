@@ -1,10 +1,11 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 
+import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { relativeTime } from "../lib/format";
-import { navigate, reportError, sourceName } from "../lib/store";
+import { navigate, openPalette, reportError, sourceName } from "../lib/store";
 import type { LibraryEntry, LibraryStatus } from "../lib/types";
 
 const TABS: { key: LibraryStatus | "all"; label: string }[] = [
@@ -70,6 +71,14 @@ export function Library() {
           <div class="empty">
             <div class="empty__title">Здесь пусто</div>
             <p>Добавляйте тайтлы кнопкой «В библиотеку» на странице аниме</p>
+            <div class="empty__actions">
+              <button class="btn btn--primary" onClick={openPalette}>
+                Найти аниме
+              </button>
+              <button class="btn" onClick={() => navigate({ name: "discover" })}>
+                Открыть каталог
+              </button>
+            </div>
           </div>
         }
       >
@@ -84,7 +93,7 @@ export function Library() {
                 >
                   <div class="library-row__art">
                     <Show when={entry.poster}>
-                      <img src={entry.poster!} alt="" loading="lazy" decoding="async" />
+                      <Art src={entry.poster} title={entry.title} />
                     </Show>
                   </div>
                   <div class="library-row__body">

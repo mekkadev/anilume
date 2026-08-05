@@ -68,6 +68,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             let data_dir = override_dir("ANILUME_DATA_DIR").unwrap_or_else(|| {

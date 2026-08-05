@@ -5,6 +5,7 @@ import { coverFor, ensureArt } from "../lib/art";
 import { KIND_LABELS } from "./ShikiCard";
 import { activeSource, closePalette, navigate, sourceName } from "../lib/store";
 import type { AnimeCard, DiscoverCard } from "../lib/types";
+import { Art } from "./Art";
 import { Icon } from "./Icon";
 
 const DEBOUNCE = 300;
@@ -177,9 +178,7 @@ export function Palette() {
                       onClick={() => open(hit)}
                     >
                       <div class="palette__art">
-                        <Show when={artFor(hit)}>
-                          <img src={artFor(hit)!} alt="" loading="lazy" decoding="async" />
-                        </Show>
+                        <Art src={artFor(hit)} title={titleOf(hit)} />
                       </div>
                       <div class="palette__text">
                         <div class="palette__name">{titleOf(hit)}</div>

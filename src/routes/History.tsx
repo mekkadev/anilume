@@ -1,10 +1,11 @@
 import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 
+import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { formatTime, plural, relativeTime } from "../lib/format";
-import { navigate, pushToast, reportError, sourceName } from "../lib/store";
+import { navigate, openPalette, pushToast, reportError, sourceName } from "../lib/store";
 import type { WatchProgress } from "../lib/types";
 
 interface Bucket {
@@ -103,6 +104,11 @@ export function History() {
           <div class="empty">
             <div class="empty__title">История пуста</div>
             <p>Здесь появятся серии, которые вы смотрели</p>
+            <div class="empty__actions">
+              <button class="btn btn--primary" onClick={openPalette}>
+                Найти аниме
+              </button>
+            </div>
           </div>
         }
       >
@@ -132,7 +138,7 @@ export function History() {
                         >
                           <div class="library-row__art">
                             <Show when={item.poster}>
-                              <img src={item.poster!} alt="" loading="lazy" decoding="async" />
+                              <Art src={item.poster} title={item.animeTitle} />
                             </Show>
                           </div>
 

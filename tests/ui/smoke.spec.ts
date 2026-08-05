@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.afterEach(() => {
-  expect(crashes, "приложение не должно ронять исключения").toEqual([]);
+  expect(crashes.join(" | "), "приложение не должно ронять исключения").toEqual("");
 });
 
 test("главная собирается из подборок каталога", async ({ page }) => {

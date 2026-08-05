@@ -1,5 +1,6 @@
 import { For, Index, Show, createEffect, createMemo, createResource } from "solid-js";
 
+import { Art } from "../components/Art";
 import { PosterSkeleton } from "../components/PosterCard";
 import { Score } from "../components/ShikiCard";
 import { api } from "../lib/api";
@@ -163,9 +164,7 @@ function Airing(props: { item: Upcoming; mine?: boolean; onOpen: () => void }) {
   return (
     <button class="airing" data-mine={Boolean(props.mine)} onClick={props.onOpen}>
       <div class="airing__art">
-        <Show when={art()}>
-          <img src={art()!} alt="" loading="lazy" decoding="async" />
-        </Show>
+        <Art src={art()} title={props.item.card.title} />
         <span class="airing__when">{clock(props.item.airsAt)}</span>
       </div>
 

@@ -1,6 +1,7 @@
-import { Show, createSignal } from "solid-js";
+import { Show } from "solid-js";
 
 import type { AnimeCard } from "../lib/types";
+import { Art } from "./Art";
 import { Icon } from "./Icon";
 import { Score } from "./ShikiCard";
 
@@ -11,8 +12,6 @@ interface PosterCardProps {
 }
 
 export function PosterCard(props: PosterCardProps) {
-  const [loaded, setLoaded] = createSignal(false);
-
   const subtitle = () => {
     const meta = props.card.meta;
     const parts: string[] = [];
@@ -25,17 +24,7 @@ export function PosterCard(props: PosterCardProps) {
   return (
     <button class="card" onClick={() => props.onOpen(props.card)}>
       <div class="card__art">
-        <Show when={props.card.poster} fallback={<div class="skeleton" style={{ height: "100%" }} />}>
-          <img
-            src={props.card.poster!}
-            alt={props.card.title}
-            loading="lazy"
-            decoding="async"
-            data-loaded={loaded()}
-            onLoad={() => setLoaded(true)}
-            onError={() => setLoaded(true)}
-          />
-        </Show>
+        <Art src={props.card.poster} title={props.card.title} />
 
         <div class="card__scrim" />
         <div class="card__play">

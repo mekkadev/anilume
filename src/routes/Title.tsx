@@ -9,6 +9,7 @@ import {
   untrack,
 } from "solid-js";
 
+import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
 import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
@@ -759,9 +760,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
 
               <div class="title-hero__grid">
                 <div class="title-poster">
-                  <Show when={poster()} fallback={<div class="skeleton" />}>
-                    <img src={poster()!} alt={info().title} decoding="async" />
-                  </Show>
+                  <Art src={poster()} title={info().title} eager />
                 </div>
 
                 <div class="title-info">
@@ -1101,14 +1100,10 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                         onClick={() => openShiki(entry.card)}
                       >
                         <div class="season-card__art">
-                          <Show when={coverFor(entry.card.id, entry.card.poster)}>
-                            <img
-                              src={coverFor(entry.card.id, entry.card.poster)!}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          </Show>
+                          <Art
+                            src={coverFor(entry.card.id, entry.card.poster)}
+                            title={entry.card.title}
+                          />
                           <span class="season-card__relation">{entry.relation}</span>
                         </div>
                         <div class="season-card__title">{entry.card.title}</div>

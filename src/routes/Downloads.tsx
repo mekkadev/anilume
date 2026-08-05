@@ -1,10 +1,11 @@
 import { For, Show, createResource, createSignal, onMount } from "solid-js";
 
+import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { qualityLabel } from "../lib/format";
-import { pushToast, reportError, sourceName } from "../lib/store";
+import { openPalette, pushToast, reportError, sourceName } from "../lib/store";
 import type { DownloadItem, DownloadStatus } from "../lib/types";
 
 const STATUS_LABELS: Record<DownloadStatus, string> = {
@@ -109,6 +110,11 @@ export function Downloads() {
           <div class="empty">
             <div class="empty__title">Загрузок пока нет</div>
             <p>Нажмите «Скачать» у серии на странице аниме</p>
+            <div class="empty__actions">
+              <button class="btn btn--primary" onClick={openPalette}>
+                Найти аниме
+              </button>
+            </div>
           </div>
         }
       >
@@ -118,7 +124,7 @@ export function Downloads() {
               <div class="download-row" data-status={item.status}>
                 <div class="library-row__art">
                   <Show when={item.poster}>
-                    <img src={item.poster!} alt="" loading="lazy" decoding="async" />
+                    <Art src={item.poster} title={item.animeTitle} />
                   </Show>
                 </div>
 
