@@ -81,3 +81,9 @@ export function extractToken(pasted: string) {
   const anyJwt = text.match(/\beyJ[A-Za-z0-9._~+/=-]{20,}/);
   return anyJwt ? anyJwt[0] : bare;
 }
+
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}

@@ -1,0 +1,229 @@
+import type { Page } from "@playwright/test";
+
+const poster = (seed: string) => `https://stub.local/${seed}.png`;
+
+const meta = (over: Record<string, unknown> = {}) => ({
+  year: 2021,
+  genres: ["Экшен", "Драма"],
+  score: 8.7,
+  episodesTotal: 12,
+  kind: "ТВ-сериал",
+  ageRating: "16+",
+  status: "Вышло",
+  altTitle: "Attack on Titan",
+  shikimoriId: 101,
+  malId: 101,
+  episodeDurationMin: 24,
+  tags: [],
+  ...over,
+});
+
+export const TITLES = [
+  "Атака титанов",
+  "Клинок, рассекающий демонов",
+  "Магическая битва",
+  "Дороро",
+];
+
+const cards = TITLES.map((title, index) => ({
+  handle: `search-${index}`,
+  source: "anilibria",
+  title,
+  poster: poster(`card-${index}`),
+  key: `https://site/a/${index}`,
+  episodeBadge: null,
+  dubBadge: null,
+  meta: meta(),
+}));
+
+const episodes = Array.from({ length: 12 }, (_, i) => ({
+  handle: `episode-${i}`,
+  ordinal: i + 1,
+  title: `Серия ${i + 1}`,
+}));
+
+const shiki = TITLES.map((title, i) => ({
+  id: 100 + i,
+  title,
+  originalTitle: `Original ${i}`,
+  poster: poster(`shiki-${i}`),
+  score: 8.4,
+  kind: "tv",
+  status: "released",
+  year: 2019 + i,
+  episodes: 12,
+}));
+
+const SOURCE_KEYS = [
+  "animelib",
+  "anilibria",
+  "animego",
+  "yummy_anime",
+  "anilibme",
+  "sameband",
+  "dreamcast",
+  "yummy_anime_org",
+  "animevost",
+  "hdrezka",
+];
+
+export const FIXTURES: Record<string, unknown> = {
+  sources_list: {
+    default: "anilibria",
+    sources: SOURCE_KEYS.map((key, i) => ({
+      key,
+      name: key,
+      description: "Источник для теста",
+      geoRestricted: false,
+      priority: (i + 1) * 10,
+      notes: [],
+    })),
+  },
+
+  catalog_ongoing: { items: cards },
+  catalog_search: { items: cards, query: "" },
+  catalog_search_multi: { query: "", groups: [{ source: "anilibria", items: cards }], failures: [] },
+  catalog_probe: { probes: [] },
+  anime_get: {
+    handle: "anime-1",
+    source: "anilibria",
+    key: "https://site/a/0",
+    title: TITLES[0],
+    poster: poster("card-0"),
+    description: "Описание из источника.",
+    meta: meta(),
+    episodes,
+  },
+  episode_studios: {
+    studios: [
+      { handle: "source-1", title: "AniLibria", player: "kodik.info", url: "https://k/1" },
+      { handle: "source-2", title: "Студийная банда", player: "aniboom.one", url: "https://a/2" },
+    ],
+  },
+  studio_videos: {
+    videos: [
+      { type: "mp4", quality: 1080, url: "https://stub.local/v.mp4", headers: {} },
+      { type: "mp4", quality: 720, url: "https://stub.local/v720.mp4", headers: {} },
+    ],
+  },
+  playback_open: { url: "https://stub.local/v.mp4" },
+  playback_close: null,
+  skip_times: [],
+
+  discover_search: shiki,
+  discover_match: shiki[0],
+  discover_title: {
+    ...shiki[0],
+    japanese: "進撃の巨人",
+    art: [],
+    description: "Полное описание с Shikimori.",
+    episodesAired: 12,
+    duration: 24,
+    rating: "r",
+    genres: ["Экшен", "Драма", "Фэнтези"],
+    studios: [{ id: 1, name: "Wit Studio" }],
+    nextEpisodeAt: null,
+    topicId: 555,
+  },
+  discover_similar: shiki.slice(1),
+  discover_related: [{ relation: "Продолжение", card: shiki[1] }],
+  discover_comments: [
+    {
+      id: 1,
+      author: "Кто-то",
+      avatar: null,
+      body: "Лучший тайтл сезона.",
+      createdAt: "2024-04-01T10:00:00+03:00",
+    },
+  ],
+  discover_options: { genres: [], studios: [] },
+  artwork_lookup: [],
+
+  continue_watching: [],
+  progress_for_anime: [],
+  watch_history: [],
+  library_get: null,
+  library_list: [],
+  library_upsert: null,
+  library_remove: null,
+
+  downloads_available: true,
+  downloads_list: [],
+  downloads_find_completed: null,
+
+  shikimori_status: { configured: false, loggedIn: false, account: null },
+  animelib_servers: { servers: [], selected: "main", hasToken: false },
+
+  cache_stats: { entries: 128, bytes: 2_400_000 },
+  cache_clear: 128,
+
+  setting_get: null,
+  setting_set: null,
+};
+
+export interface HarnessOptions {
+  stalled?: string[];
+  overrides?: Record<string, unknown>;
+  latencyMs?: number;
+}
+
+export async function installTauri(page: Page, options: HarnessOptions = {}) {
+  const payload = {
+    fixtures: { ...FIXTURES, ...(options.overrides ?? {}) },
+    stalled: options.stalled ?? [],
+    latency: options.latencyMs ?? 40,
+  };
+
+  await page.addInitScript((config: typeof payload) => {
+    const anyWindow = window as unknown as Record<string, unknown>;
+    anyWindow.__CALLS__ = [] as string[];
+    anyWindow.__TAURI_OS_PLUGIN_INTERNALS__ = { os_type: "macos", platform: "macos" };
+    anyWindow.__TAURI_INTERNALS__ = {
+      metadata: {
+        currentWindow: { label: "main" },
+        currentWebview: { label: "main" },
+      },
+      invoke: (cmd: string, args: Record<string, unknown>) => {
+        if (cmd.startsWith("plugin:")) return Promise.resolve(0);
+        (anyWindow.__CALLS__ as string[]).push(cmd);
+
+        let value = cmd in config.fixtures ? config.fixtures[cmd] : null;
+
+        if (cmd === "catalog_search") {
+          const query = String(args?.query ?? "");
+          anyWindow.__QUERY__ = query;
+          const base = (config.fixtures.catalog_search as { items: unknown[] }).items[0];
+          value = {
+            query,
+            items: [{ ...(base as object), title: query, key: `k-${query}` }],
+          };
+        }
+        if (cmd === "anime_get") {
+          value = {
+            ...(config.fixtures.anime_get as object),
+            title: anyWindow.__QUERY__ ?? (config.fixtures.anime_get as { title: string }).title,
+          };
+        }
+
+        const delay = config.stalled.includes(cmd) ? 60_000 : config.latency;
+        return new Promise((resolve) => setTimeout(() => resolve(value), delay));
+      },
+      transformCallback: (cb: unknown) => {
+        const id = Math.floor(Math.random() * 1e9);
+        anyWindow[`_${id}`] = cb;
+        return id;
+      },
+    };
+  }, payload);
+
+  await page.route("**stub.local/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: Buffer.alloc(0) }),
+  );
+}
+
+export function watchForCrashes(page: Page, sink: string[]) {
+  page.on("pageerror", (error) => sink.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") sink.push(message.text());
+  });
+}

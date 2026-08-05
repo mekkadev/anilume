@@ -98,6 +98,8 @@ pub fn run() {
             commands::library_remove,
             commands::setting_get,
             commands::setting_set,
+            commands::cache_stats,
+            commands::cache_clear,
             commands::shikimori_status,
             commands::shikimori_configure,
             commands::shikimori_authorize_url,

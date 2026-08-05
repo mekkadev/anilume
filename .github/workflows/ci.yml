@@ -68,6 +68,20 @@ jobs:
       - name: Сборка интерфейса
         run: npm run build
 
+      - name: Установить браузер для тестов интерфейса
+        run: npx playwright install --with-deps chromium
+
+      - name: Тесты интерфейса
+        run: npx playwright test
+
+      - name: Отчёт упавших тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results
+          retention-days: 7
+
   bundle:
     name: ${{ matrix.label }}
     needs: checks

@@ -1,9 +1,11 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
+use crate::db::Db;
 use crate::error::{CoreError, Result};
 
 pub const CATALOG_BASE: &str = "https://shikimori.one";
@@ -30,6 +32,13 @@ const WINDOW: Duration = Duration::from_secs(60);
 const WINDOW_LIMIT: usize = 80;
 const RETRIES: usize = 3;
 const RETRY_BACKOFF: Duration = Duration::from_millis(600);
+
+const TTL_CATALOG: i64 = 60 * 60;
+const TTL_TITLE: i64 = 24 * 60 * 60;
+const TTL_LINKS: i64 = 7 * 24 * 60 * 60;
+const TTL_COMMENTS: i64 = 10 * 60;
+const TTL_OPTIONS: i64 = 30 * 24 * 60 * 60;
+const TTL_MATCH: i64 = 30 * 24 * 60 * 60;
 const PAGE_SIZE: i64 = 40;
 const MAX_PAGE: i64 = 100;
 const YEAR_FLOOR: i64 = 1960;
@@ -148,7 +157,11 @@ impl DiscoverQuery {
 
         let low = from.unwrap_or(YEAR_FLOOR).clamp(YEAR_FLOOR, YEAR_CEIL);
         let high = to.unwrap_or(YEAR_CEIL).clamp(YEAR_FLOOR, YEAR_CEIL);
-        let (low, high) = if low <= high { (low, high) } else { (high, low) };
+        let (low, high) = if low <= high {
+            (low, high)
+        } else {
+            (high, low)
+        };
 
         if low == high {
             Some(low.to_string())
@@ -352,6 +365,19 @@ fn join_ids(ids: &[i64]) -> Option<String> {
     }
 }
 
+fn cache_key(path: &str, params: &[(String, String)]) -> String {
+    let mut pairs: Vec<String> = params
+        .iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect();
+    pairs.sort();
+    if pairs.is_empty() {
+        format!("shiki:{path}")
+    } else {
+        format!("shiki:{path}?{}", pairs.join("&"))
+    }
+}
+
 fn absolute(path: &str) -> String {
     if path.starts_with("http://") || path.starts_with("https://") {
         path.to_owned()
@@ -460,9 +486,10 @@ fn card_from_raw(raw: RawAnime) -> DiscoverCard {
             .as_deref()
             .and_then(|date| date.get(..4))
             .and_then(|year| year.parse::<i64>().ok()),
-        episodes: raw.episodes.filter(|count| *count > 0).or(raw
-            .episodes_aired
-            .filter(|count| *count > 0)),
+        episodes: raw
+            .episodes
+            .filter(|count| *count > 0)
+            .or(raw.episodes_aired.filter(|count| *count > 0)),
     }
 }
 
@@ -498,7 +525,11 @@ fn detail_from_raw(raw: RawDetail) -> TitleDetail {
         japanese: raw.japanese.filter(|value| !value.trim().is_empty()),
         poster: card.poster,
         art,
-        description: raw.description.as_deref().map(strip_bbcode).unwrap_or_default(),
+        description: raw
+            .description
+            .as_deref()
+            .map(strip_bbcode)
+            .unwrap_or_default(),
         score: card.score,
         kind: card.kind,
         status: card.status,
@@ -537,10 +568,13 @@ fn plausible(needle: &str, card: &DiscoverCard) -> bool {
     if needle.is_empty() {
         return false;
     }
-    [&card.title, &card.original_title].into_iter().any(|title| {
-        let other = normalise(title);
-        !other.is_empty() && (other == needle || other.contains(needle) || needle.contains(&other))
-    })
+    [&card.title, &card.original_title]
+        .into_iter()
+        .any(|title| {
+            let other = normalise(title);
+            !other.is_empty()
+                && (other == needle || other.contains(needle) || needle.contains(&other))
+        })
 }
 
 fn best_match(name: &str, year: Option<i64>, cards: Vec<DiscoverCard>) -> Option<DiscoverCard> {
@@ -567,24 +601,28 @@ fn best_match(name: &str, year: Option<i64>, cards: Vec<DiscoverCard>) -> Option
 
 pub struct Discover {
     http: reqwest::Client,
+    db: Arc<Db>,
     throttle: Mutex<Vec<Instant>>,
     options: Mutex<Option<DiscoverOptions>>,
 }
 
 impl Discover {
-    pub fn new() -> Result<Self> {
+    pub fn new(db: Arc<Db>) -> Result<Self> {
         Ok(Self {
             http: reqwest::Client::builder()
                 .timeout(Duration::from_secs(12))
                 .connect_timeout(Duration::from_secs(6))
                 .build()?,
+            db,
             throttle: Mutex::new(Vec::new()),
             options: Mutex::new(None),
         })
     }
 
     pub async fn search(&self, query: &DiscoverQuery) -> Result<Vec<DiscoverCard>> {
-        let raw: Vec<RawAnime> = self.fetch("/api/animes", &query.params()).await?;
+        let raw: Vec<RawAnime> = self
+            .fetch("/api/animes", &query.params(), TTL_CATALOG)
+            .await?;
         Ok(raw.into_iter().map(card_from_raw).collect())
     }
 
@@ -593,8 +631,8 @@ impl Discover {
             return Ok(cached);
         }
 
-        let genres: Vec<RawGenre> = self.fetch("/api/genres", &[]).await?;
-        let studios: Vec<RawStudio> = self.fetch("/api/studios", &[]).await?;
+        let genres: Vec<RawGenre> = self.fetch("/api/genres", &[], TTL_OPTIONS).await?;
+        let studios: Vec<RawStudio> = self.fetch("/api/studios", &[], TTL_OPTIONS).await?;
 
         let mut genres: Vec<Named> = genres
             .into_iter()
@@ -628,17 +666,23 @@ impl Discover {
     }
 
     pub async fn title(&self, id: i64) -> Result<TitleDetail> {
-        let raw: RawDetail = self.fetch(&format!("/api/animes/{id}"), &[]).await?;
+        let raw: RawDetail = self
+            .fetch(&format!("/api/animes/{id}"), &[], TTL_TITLE)
+            .await?;
         Ok(detail_from_raw(raw))
     }
 
     pub async fn similar(&self, id: i64, limit: usize) -> Result<Vec<DiscoverCard>> {
-        let raw: Vec<RawAnime> = self.fetch(&format!("/api/animes/{id}/similar"), &[]).await?;
+        let raw: Vec<RawAnime> = self
+            .fetch(&format!("/api/animes/{id}/similar"), &[], TTL_LINKS)
+            .await?;
         Ok(raw.into_iter().take(limit).map(card_from_raw).collect())
     }
 
     pub async fn related(&self, id: i64) -> Result<Vec<RelatedTitle>> {
-        let raw: Vec<RawRelated> = self.fetch(&format!("/api/animes/{id}/related"), &[]).await?;
+        let raw: Vec<RawRelated> = self
+            .fetch(&format!("/api/animes/{id}/related"), &[], TTL_LINKS)
+            .await?;
         Ok(raw
             .into_iter()
             .filter_map(|entry| {
@@ -663,7 +707,7 @@ impl Discover {
             ("desc".to_owned(), "1".to_owned()),
         ];
 
-        let raw: Vec<RawComment> = self.fetch("/api/comments", &params).await?;
+        let raw: Vec<RawComment> = self.fetch("/api/comments", &params, TTL_COMMENTS).await?;
         Ok(raw
             .into_iter()
             .filter_map(|entry| {
@@ -700,7 +744,7 @@ impl Discover {
             ("search".to_owned(), trimmed.to_owned()),
             ("limit".to_owned(), "10".to_owned()),
         ];
-        let raw: Vec<RawAnime> = self.fetch("/api/animes", &params).await?;
+        let raw: Vec<RawAnime> = self.fetch("/api/animes", &params, TTL_MATCH).await?;
         let cards: Vec<DiscoverCard> = raw.into_iter().map(card_from_raw).collect();
         Ok(best_match(trimmed, year, cards))
     }
@@ -709,7 +753,39 @@ impl Discover {
         &self,
         path: &str,
         params: &[(String, String)],
+        ttl: i64,
     ) -> Result<T> {
+        let key = cache_key(path, params);
+        let mut stale: Option<String> = None;
+
+        if let Ok(Some(hit)) = self.db.cache_read(&key) {
+            if hit.age <= ttl {
+                if let Ok(parsed) = serde_json::from_str(&hit.value) {
+                    return Ok(parsed);
+                }
+            }
+            stale = Some(hit.value);
+        }
+
+        let text = match self.load(path, params).await {
+            Ok(text) => {
+                let _ = self.db.cache_write(&key, &text);
+                text
+            }
+            Err(error) => match stale {
+                Some(text) => {
+                    tracing::warn!(target: "discover", "{path}: отдаю кэш, живой запрос упал: {error}");
+                    text
+                }
+                None => return Err(error),
+            },
+        };
+
+        serde_json::from_str(&text)
+            .map_err(|e| CoreError::Other(format!("Каталог Shikimori вернул не JSON: {e}")))
+    }
+
+    async fn load(&self, path: &str, params: &[(String, String)]) -> Result<String> {
         let mut attempt = 0;
         let response = loop {
             self.pace().await;
@@ -759,9 +835,7 @@ impl Discover {
             )));
         }
 
-        let text = response.text().await?;
-        serde_json::from_str(&text)
-            .map_err(|e| CoreError::Other(format!("Каталог Shikimori вернул не JSON: {e}")))
+        Ok(response.text().await?)
     }
 
     async fn pace(&self) {
@@ -933,7 +1007,8 @@ mod tests {
 
     #[test]
     fn bbcode_markup_is_reduced_to_plain_text() {
-        let source = "Король пиратов, [character=4883]Роджер[/character], был [b]единственным[/b].[br]\
+        let source =
+            "Король пиратов, [character=4883]Роджер[/character], был [b]единственным[/b].[br]\
                       [url=https://x]Ссылка[/url] в конце.";
         assert_eq!(
             strip_bbcode(source),
@@ -952,7 +1027,10 @@ mod tests {
 
     #[test]
     fn an_unclosed_bracket_does_not_swallow_the_description() {
-        assert_eq!(strip_bbcode("Текст [b без закрытия"), "Текст b без закрытия");
+        assert_eq!(
+            strip_bbcode("Текст [b без закрытия"),
+            "Текст b без закрытия"
+        );
     }
 
     #[test]
@@ -983,7 +1061,13 @@ mod tests {
         assert_eq!(detail.japanese.as_deref(), Some("ワンピース"));
         assert_eq!(detail.description, "Пираты здесь.");
         assert_eq!(detail.genres, vec!["Экшен"]);
-        assert_eq!(detail.studios, vec![Named { id: 18, name: "Toei".into() }]);
+        assert_eq!(
+            detail.studios,
+            vec![Named {
+                id: 18,
+                name: "Toei".into()
+            }]
+        );
         assert_eq!(
             detail.art,
             vec![format!("{CATALOG_BASE}/system/screenshots/original/a.jpg")]
@@ -1045,7 +1129,11 @@ mod tests {
 
     #[test]
     fn an_unrelated_first_result_is_refused_rather_than_guessed() {
-        let found = best_match("что-то другое", None, vec![card(7, "Ван-Пис", "One Piece", None)]);
+        let found = best_match(
+            "что-то другое",
+            None,
+            vec![card(7, "Ван-Пис", "One Piece", None)],
+        );
         assert_eq!(found, None);
         assert_eq!(best_match("что угодно", None, Vec::new()), None);
     }
@@ -1057,7 +1145,12 @@ mod tests {
             None,
             vec![
                 card(1, "Люпен III: Часть III", "Lupin III: Part III", Some(1984)),
-                card(2, "Ванпанчмен 3. Часть 2", "One Punch Man 3 Part 2", Some(2026)),
+                card(
+                    2,
+                    "Ванпанчмен 3. Часть 2",
+                    "One Punch Man 3 Part 2",
+                    Some(2026),
+                ),
             ],
         );
         assert_eq!(found.unwrap().id, 2);
@@ -1082,8 +1175,68 @@ mod tests {
 
     #[test]
     fn a_poster_that_is_already_absolute_is_left_alone() {
-        assert_eq!(absolute("https://cdn.example/a.jpg"), "https://cdn.example/a.jpg");
+        assert_eq!(
+            absolute("https://cdn.example/a.jpg"),
+            "https://cdn.example/a.jpg"
+        );
         assert_eq!(absolute("/a.jpg"), format!("{CATALOG_BASE}/a.jpg"));
+    }
+
+    #[test]
+    fn cache_key_ignores_the_order_of_query_parameters() {
+        let one = cache_key(
+            "/api/animes",
+            &[
+                ("order".to_owned(), "popularity".to_owned()),
+                ("page".to_owned(), "2".to_owned()),
+            ],
+        );
+        let other = cache_key(
+            "/api/animes",
+            &[
+                ("page".to_owned(), "2".to_owned()),
+                ("order".to_owned(), "popularity".to_owned()),
+            ],
+        );
+
+        assert_eq!(one, other);
+        assert_eq!(one, "shiki:/api/animes?order=popularity&page=2");
+        assert_eq!(cache_key("/api/genres", &[]), "shiki:/api/genres");
+    }
+
+    #[tokio::test]
+    async fn a_fresh_cache_answers_without_touching_the_network() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let query = DiscoverQuery::default();
+        db.cache_write(
+            &cache_key("/api/animes", &query.params()),
+            r#"[{"id":1,"name":"Cowboy Bebop","russian":"Ковбой Бибоп","episodes":26}]"#,
+        )
+        .unwrap();
+
+        let discover = Discover::new(db).unwrap();
+        let cards = discover.search(&query).await.unwrap();
+
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].title, "Ковбой Бибоп");
+        assert_eq!(cards[0].original_title, "Cowboy Bebop");
+    }
+
+    #[tokio::test]
+    async fn a_stale_cache_is_kept_and_reused_when_the_catalog_is_unreachable() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let key = cache_key("/api/animes/1", &[]);
+        db.cache_write(&key, r#"{"id":1,"name":"Cowboy Bebop"}"#)
+            .unwrap();
+        {
+            let conn = db.raw_connection();
+            conn.execute("UPDATE cache SET fetched_at = fetched_at - 999999", [])
+                .unwrap();
+        }
+
+        let hit = db.cache_read(&key).unwrap().unwrap();
+        assert!(hit.age > TTL_TITLE);
+        assert!(serde_json::from_str::<RawDetail>(&hit.value).is_ok());
     }
 
     #[test]

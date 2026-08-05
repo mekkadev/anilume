@@ -146,6 +146,15 @@ impl Db {
                 created_at       INTEGER NOT NULL,
                 UNIQUE (source, anime_key, episode_ordinal, quality)
             );
+
+            CREATE TABLE IF NOT EXISTS cache (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,
+                fetched_at  INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_cache_age
+                ON cache (fetched_at);
             "#,
         )?;
         Ok(())
@@ -359,6 +368,70 @@ impl Db {
         conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
         Ok(())
     }
+
+    pub fn cache_read(&self, key: &str) -> Result<Option<Cached>> {
+        let conn = self.lock();
+        let found = conn
+            .query_row(
+                "SELECT value, fetched_at FROM cache WHERE key = ?1",
+                params![key],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .optional()?;
+
+        Ok(found.map(|(value, fetched_at)| Cached {
+            value,
+            age: (now() - fetched_at).max(0),
+        }))
+    }
+
+    pub fn cache_write(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.lock();
+        conn.execute(
+            "INSERT INTO cache (key, value, fetched_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value,
+                                             fetched_at = excluded.fetched_at",
+            params![key, value, now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn cache_purge(&self, max_age: i64) -> Result<usize> {
+        let conn = self.lock();
+        let removed = conn.execute(
+            "DELETE FROM cache WHERE fetched_at < ?1",
+            params![now() - max_age],
+        )?;
+        Ok(removed)
+    }
+
+    pub fn cache_clear(&self) -> Result<usize> {
+        let conn = self.lock();
+        Ok(conn.execute("DELETE FROM cache", [])?)
+    }
+
+    pub fn cache_size(&self) -> Result<CacheStats> {
+        let conn = self.lock();
+        let (entries, bytes) = conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(LENGTH(value)), 0) FROM cache",
+            [],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        )?;
+        Ok(CacheStats { entries, bytes })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Cached {
+    pub value: String,
+    pub age: i64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheStats {
+    pub entries: i64,
+    pub bytes: i64,
 }
 
 fn now() -> i64 {
@@ -647,5 +720,66 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(found.position_sec, 42.0);
+    }
+
+    #[test]
+    fn cache_returns_the_stored_value_with_its_age() {
+        let db = Db::open_in_memory().unwrap();
+        assert!(db.cache_read("animes?page=1").unwrap().is_none());
+
+        db.cache_write("animes?page=1", "[{\"id\":1}]").unwrap();
+        let hit = db.cache_read("animes?page=1").unwrap().unwrap();
+        assert_eq!(hit.value, "[{\"id\":1}]");
+        assert!(hit.age <= 1);
+    }
+
+    #[test]
+    fn cache_write_overwrites_and_refreshes_the_timestamp() {
+        let db = Db::open_in_memory().unwrap();
+        db.cache_write("k", "старое").unwrap();
+        {
+            let conn = db.lock();
+            conn.execute("UPDATE cache SET fetched_at = fetched_at - 9000", [])
+                .unwrap();
+        }
+        assert!(db.cache_read("k").unwrap().unwrap().age >= 9000);
+
+        db.cache_write("k", "новое").unwrap();
+        let hit = db.cache_read("k").unwrap().unwrap();
+        assert_eq!(hit.value, "новое");
+        assert!(hit.age <= 1);
+    }
+
+    #[test]
+    fn purge_drops_only_entries_past_the_limit() {
+        let db = Db::open_in_memory().unwrap();
+        db.cache_write("свежее", "1").unwrap();
+        db.cache_write("древнее", "2").unwrap();
+        {
+            let conn = db.lock();
+            conn.execute(
+                "UPDATE cache SET fetched_at = fetched_at - 100000 WHERE key = 'древнее'",
+                [],
+            )
+            .unwrap();
+        }
+
+        assert_eq!(db.cache_purge(50_000).unwrap(), 1);
+        assert!(db.cache_read("свежее").unwrap().is_some());
+        assert!(db.cache_read("древнее").unwrap().is_none());
+    }
+
+    #[test]
+    fn cache_stats_count_entries_and_payload_size() {
+        let db = Db::open_in_memory().unwrap();
+        db.cache_write("a", "12345").unwrap();
+        db.cache_write("b", "678").unwrap();
+
+        let stats = db.cache_size().unwrap();
+        assert_eq!(stats.entries, 2);
+        assert_eq!(stats.bytes, 8);
+
+        assert_eq!(db.cache_clear().unwrap(), 2);
+        assert_eq!(db.cache_size().unwrap().entries, 0);
     }
 }

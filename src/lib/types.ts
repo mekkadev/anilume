@@ -7,6 +7,11 @@ export interface SourceInfo {
   notes: string[];
 }
 
+export interface CacheStats {
+  entries: number;
+  bytes: number;
+}
+
 export interface SourceProbe {
   source: string;
   handle: string;

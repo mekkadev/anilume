@@ -125,13 +125,26 @@ Shikimori лимит и на секунду, и на минуту, и одной
 Поэтому обложки берутся из [AniList](https://anilist.co): `extraLarge` — 460×636,
 вдвое больше по каждой стороне. Сопоставление идёт по id MyAnimeList, а у аниме
 id Shikimori и MAL совпадают, так что промежуточного поиска не нужно. Один запрос
-отдаёт до пятидесяти тайтлов сразу, ответы кешируются в памяти на всё время
-работы, запросы разведены на 800 мс.
+отдаёт до пятидесяти тайтлов сразу, ответы кешируются на диске на месяц,
+запросы разведены на 800 мс.
 
 Широкий арт для героя на главной и шапки страницы аниме — это кадры Shikimori
 (1920×1080), а если их нет, баннер AniList (1900×400). Когда нет ни того ни
 другого, вместо растянутого постера показывается он же, но размытый: честнее
 признать, что большой картинки нет, чем выдать мыло за неё.
+
+## кэш каталога
+
+Всё, что приходит из Shikimori и AniList, складывается в SQLite рядом с базой
+просмотров. Подборки живут час, описания тайтлов — сутки, связанное и похожее —
+неделю, обложки — месяц. Пока запись свежая, приложение вообще не ходит в сеть:
+главная рисуется сразу при запуске, а лимиты Shikimori (5 запросов в секунду и
+90 в минуту) не тратятся впустую.
+
+Когда запись устарела, приложение идёт за новой — и если каталог не ответил,
+отдаёт старую вместо пустого экрана. Провайдер режет Shikimori, зеркала легли,
+интернета нет — вчерашние подборки и описания на месте. Размер кэша и кнопка
+очистки лежат в настройках.
 
 ## интерфейс
 
@@ -285,10 +298,18 @@ npm run app:build        # бандл
 
 ```bash
 pytest                          # 55 тестов сайдкара, без сети
-cargo test -p anilume-core      # 89 тестов ядра, включая живой прокси
+cargo test -p anilume-core      # 104 теста ядра, включая живой прокси
 npm run typecheck
+npm run test:ui                 # 9 сквозных тестов интерфейса в браузере
 python scripts/design_lint.py   # правила оформления
 ```
+
+Сквозные тесты поднимают собранный интерфейс в headless-Chromium с подменённым
+мостом Tauri: каждый вызов бэкенда отвечает заранее заданными данными, а часть
+вызовов можно намеренно подвесить. Так проверяется, что страница аниме
+открывается, пока опрос источников ещё идёт, что переход между тайтлами
+перерисовывает страницу, что серия открывает плеер — и что за весь прогон в
+консоль не улетело ни одного исключения.
 
 Иконка приложения собирается из логотипа одной командой — он обрезается
 по содержимому, центрируется с полями и раскладывается во все размеры
@@ -447,13 +468,27 @@ and hopeless as a hero image — a stretched poster looks like 240p because it i
 so covers come from [anilist](https://anilist.co): `extraLarge` is 460×636, twice
 the size on each side. matching is by myanimelist id, and for anime the shikimori
 and mal ids are the same, so no intermediate search is needed. one request covers
-fifty titles, answers are cached in memory for the session, and requests are
-spaced 800ms apart.
+fifty titles, answers are cached on disk for a month, and requests are spaced
+800ms apart.
 
 the wide art behind the home hero and the title page header is a shikimori
 screenshot (1920×1080), or an anilist banner (1900×400) when there is none. with
 neither, the poster is shown blurred rather than stretched — better to admit
 there is no big image than to pass mush off as one.
+
+## the catalogue cache
+
+everything shikimori and anilist return is stored in sqlite next to the watch
+database. rows live for an hour, title descriptions for a day, related and
+similar for a week, cover art for a month. while an entry is fresh the app does
+not go online at all: the home screen paints instantly on launch and shikimori's
+limits (5 requests a second, 90 a minute) are not wasted.
+
+when an entry goes stale the app fetches a new one — and if the catalogue does
+not answer, it serves the old one instead of an empty screen. your isp blocks
+shikimori, the mirrors are down, there is no internet at all: yesterday's rows
+and descriptions are still there. the cache size and a clear button sit in
+settings.
 
 ## the interface
 
@@ -601,10 +636,18 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 55, sidecar, no network
-cargo test -p anilume-core      # 89, includes a real proxy round-trip
+cargo test -p anilume-core      # 104, includes a real proxy round-trip
 npm run typecheck
+npm run test:ui                 # 9, the interface end to end in a browser
 python scripts/design_lint.py
 ```
+
+the end-to-end tests serve the built interface to headless chromium with the
+tauri bridge replaced: every backend call answers with fixed data, and chosen
+calls can be stalled on purpose. that is how we check that the anime page opens
+while the sources are still being polled, that moving between titles repaints
+the page, that an episode opens the player — and that not a single exception
+reached the console during the whole run.
 
 the rust core is a separate crate from the tauri shell on purpose: the shell
 needs webview system libraries, the core does not, so tests and lint run

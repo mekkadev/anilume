@@ -2,7 +2,7 @@ import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
-import { extractToken } from "../lib/format";
+import { extractToken, formatBytes, plural } from "../lib/format";
 import { activeSource, pushToast, reportError, setActiveSource, sources } from "../lib/store";
 
 const OOB = "urn:ietf:wg:oauth:2.0:oob";
@@ -18,8 +18,22 @@ export function Settings() {
   const [animelib, { refetch: refetchAnimelib }] = createResource(() =>
     api.animelibServers(),
   );
+  const [cache, { refetch: refetchCache }] = createResource(() => api.cacheStats());
   const [libToken, setLibToken] = createSignal("");
   const [savingLib, setSavingLib] = createSignal(false);
+
+  const dropCache = async () => {
+    try {
+      const removed = await api.cacheClear();
+      await refetchCache();
+      pushToast(
+        removed > 0 ? "Кэш очищен, данные загрузятся заново" : "Кэш и так пуст",
+        "success",
+      );
+    } catch (error) {
+      reportError(error);
+    }
+  };
 
   const saveAnimelibToken = async () => {
     const token = extractToken(libToken());
@@ -336,6 +350,35 @@ export function Settings() {
             </button>
           </div>
         </Show>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel__title">Кэш каталога</h2>
+        <p class="panel__hint">
+          Описания, подборки и обложки хранятся на диске, поэтому приложение
+          открывается сразу и продолжает показывать каталог, когда Shikimori
+          недоступен. Устаревшее обновляется само.
+        </p>
+
+        <div class="panel__row">
+          <span class="panel__rowlabel">Сейчас на диске</span>
+          <Show when={cache()} fallback={<span class="page-sub">считаем…</span>}>
+            {(stats) => (
+              <span class="page-sub">
+                {stats().entries} {plural(stats().entries, "запись", "записи", "записей")}
+                {" · "}
+                {formatBytes(stats().bytes)}
+              </span>
+            )}
+          </Show>
+        </div>
+
+        <div class="panel__actions">
+          <button class="btn" onClick={() => void dropCache()}>
+            <Icon name="trash" size={14} />
+            Очистить кэш
+          </button>
+        </div>
       </section>
 
       <section class="panel">

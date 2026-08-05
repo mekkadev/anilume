@@ -13,7 +13,9 @@
     "app:build": "tauri build",
     "sidecar:dev": "python3 -m anilume_sidecar",
     "sidecar:build": "python3 sidecar/build_sidecar.py",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui": "vite build && playwright test",
+    "test:ui:only": "playwright test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
@@ -27,6 +29,7 @@
     "solid-js": "^1.9.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tauri-apps/cli": "^2.1.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",

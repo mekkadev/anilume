@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
+use crate::db::Db;
 use crate::error::{CoreError, Result};
 
 pub const ARTWORK_API: &str = "https://graphql.anilist.co";
@@ -11,6 +13,9 @@ pub const ARTWORK_API: &str = "https://graphql.anilist.co";
 const MIN_REQUEST_GAP: Duration = Duration::from_millis(800);
 const BATCH: usize = 50;
 const MAX_IDS: usize = 200;
+
+const TTL_ART: i64 = 30 * 24 * 60 * 60;
+const TTL_ART_EMPTY: i64 = 3 * 24 * 60 * 60;
 
 const QUERY: &str = "query ($ids: [Int]) {
   Page(page: 1, perPage: 50) {
@@ -22,7 +27,7 @@ const QUERY: &str = "query ($ids: [Int]) {
   }
 }";
 
-#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Artwork {
     pub mal_id: i64,
@@ -77,6 +82,10 @@ fn artwork_from_raw(raw: RawMedia) -> Option<Artwork> {
     })
 }
 
+fn art_key(mal_id: i64) -> String {
+    format!("art:{mal_id}")
+}
+
 pub fn wanted(ids: &[i64], known: &HashMap<i64, Artwork>) -> Vec<i64> {
     let mut seen = Vec::new();
     for id in ids {
@@ -93,16 +102,18 @@ pub fn wanted(ids: &[i64], known: &HashMap<i64, Artwork>) -> Vec<i64> {
 
 pub struct Artworks {
     http: reqwest::Client,
+    db: Arc<Db>,
     throttle: Mutex<Option<Instant>>,
     cache: Mutex<HashMap<i64, Artwork>>,
 }
 
 impl Artworks {
-    pub fn new() -> Result<Self> {
+    pub fn new(db: Arc<Db>) -> Result<Self> {
         Ok(Self {
             http: reqwest::Client::builder()
                 .timeout(Duration::from_secs(20))
                 .build()?,
+            db,
             throttle: Mutex::new(None),
             cache: Mutex::new(HashMap::new()),
         })
@@ -110,23 +121,38 @@ impl Artworks {
 
     pub async fn lookup(&self, ids: &[i64]) -> Result<Vec<Artwork>> {
         let missing = {
-            let cache = self.cache.lock().await;
+            let mut cache = self.cache.lock().await;
+            self.warm(ids, &mut cache);
             wanted(ids, &cache)
         };
 
         for chunk in missing.chunks(BATCH) {
-            let fetched = self.fetch(chunk).await.unwrap_or_default();
+            let fetched = self.fetch(chunk).await;
+            let answered = fetched.is_ok();
+            let fetched = fetched.unwrap_or_default();
 
             let mut cache = self.cache.lock().await;
-            for id in chunk {
-                cache.entry(*id).or_insert_with(|| Artwork {
-                    mal_id: *id,
-                    cover: None,
-                    banner: None,
-                });
+            if answered {
+                for id in chunk {
+                    cache.entry(*id).or_insert_with(|| Artwork {
+                        mal_id: *id,
+                        cover: None,
+                        banner: None,
+                    });
+                }
             }
             for art in fetched {
                 cache.insert(art.mal_id, art);
+            }
+
+            if answered {
+                for id in chunk {
+                    if let Some(art) = cache.get(id) {
+                        if let Ok(value) = serde_json::to_string(art) {
+                            let _ = self.db.cache_write(&art_key(*id), &value);
+                        }
+                    }
+                }
             }
         }
 
@@ -136,6 +162,28 @@ impl Artworks {
             .filter_map(|id| cache.get(id).cloned())
             .filter(|art| art.cover.is_some() || art.banner.is_some())
             .collect())
+    }
+
+    fn warm(&self, ids: &[i64], cache: &mut HashMap<i64, Artwork>) {
+        for id in ids {
+            if *id <= 0 || cache.contains_key(id) {
+                continue;
+            }
+            let Ok(Some(hit)) = self.db.cache_read(&art_key(*id)) else {
+                continue;
+            };
+            let Ok(art) = serde_json::from_str::<Artwork>(&hit.value) else {
+                continue;
+            };
+            let ttl = if art.cover.is_some() || art.banner.is_some() {
+                TTL_ART
+            } else {
+                TTL_ART_EMPTY
+            };
+            if hit.age <= ttl {
+                cache.insert(*id, art);
+            }
+        }
     }
 
     async fn fetch(&self, ids: &[i64]) -> Result<Vec<Artwork>> {
@@ -252,7 +300,8 @@ mod tests {
 
     #[test]
     fn an_empty_page_parses_into_nothing() {
-        let parsed: RawResponse = serde_json::from_str(r#"{"data":{"Page":{"media":[]}}}"#).unwrap();
+        let parsed: RawResponse =
+            serde_json::from_str(r#"{"data":{"Page":{"media":[]}}}"#).unwrap();
         assert!(parsed
             .data
             .and_then(|d| d.page)

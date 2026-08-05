@@ -7,6 +7,8 @@ use anilume_core::{
 };
 use tokio::sync::Mutex;
 
+const CACHE_LIFETIME: i64 = 30 * 24 * 60 * 60;
+
 pub struct AppState {
     pub sidecar: Arc<SidecarClient>,
     pub proxy: ProxyHandle,
@@ -21,11 +23,16 @@ pub struct AppState {
 impl AppState {
     pub async fn initialize(data_dir: PathBuf, downloads_dir: PathBuf) -> Result<Self> {
         let db = Arc::new(Db::open(&data_dir.join("anilume.db"))?);
+        if let Ok(dropped) = db.cache_purge(CACHE_LIFETIME) {
+            if dropped > 0 {
+                tracing::info!("кэш каталога: удалено записей — {dropped}");
+            }
+        }
         let sidecar = SidecarClient::spawn(&resolve_sidecar()?).await?;
         let proxy = ProxyHandle::start().await?;
         let shikimori = Arc::new(Shikimori::new(db.clone())?);
-        let discover = Arc::new(Discover::new()?);
-        let artworks = Arc::new(Artworks::new()?);
+        let discover = Arc::new(Discover::new(db.clone())?);
+        let artworks = Arc::new(Artworks::new(db.clone())?);
         let downloads = Arc::new(DownloadManager::new(
             db.clone(),
             resolve_ffmpeg(),

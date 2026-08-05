@@ -20,6 +20,7 @@ import type {
   ShikiComment,
   ShikimoriStatus,
   SourceInfo,
+  CacheStats,
   SourceProbe,
   StudioInfo,
   TitleDetail,
@@ -74,6 +75,10 @@ export const api = {
     call<{ probes: SourceProbe[] }>("catalog_probe", { items }),
 
   anime: (handle: string) => call<AnimeDetail>("anime_get", { handle }),
+
+  cacheStats: () => call<CacheStats>("cache_stats"),
+
+  cacheClear: () => call<number>("cache_clear"),
 
   sourceConfigSet: (section: string, values: Record<string, unknown>) =>
     call<{ section: string; keys: string[] }>("source_config_set", { section, values }),

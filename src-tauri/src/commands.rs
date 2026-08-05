@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anilume_core::error::CoreErrorWire;
 use anilume_core::discover::{Comment, RelatedTitle, TitleDetail};
 use anilume_core::{
-    Artwork,
+    Artwork, CacheStats,
     ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
     LibraryEntry, WatchProgress,
 };
@@ -345,6 +345,16 @@ pub async fn setting_get(state: State<'_, AppState>, key: String) -> Answer<Opti
 pub async fn setting_set(state: State<'_, AppState>, key: String, value: String) -> Answer<()> {
     state.db.setting_set(&key, &value)?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn cache_stats(state: State<'_, AppState>) -> Answer<CacheStats> {
+    Ok(state.db.cache_size()?)
+}
+
+#[tauri::command]
+pub async fn cache_clear(state: State<'_, AppState>) -> Answer<usize> {
+    Ok(state.db.cache_clear()?)
 }
 
 #[tauri::command]

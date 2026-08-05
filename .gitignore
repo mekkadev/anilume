@@ -4,6 +4,10 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# Playwright
+test-results/
+playwright-report/
+
 # Rust
 target/
 **/*.rs.bk
