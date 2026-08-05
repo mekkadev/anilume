@@ -6,6 +6,41 @@ use tauri::{Emitter, Manager};
 use state::AppState;
 
 pub const DOWNLOAD_EVENT: &str = "anilume://download-progress";
+pub const AIRED_EVENT: &str = "anilume://episode-aired";
+
+const AIRING_FIRST_DELAY: std::time::Duration = std::time::Duration::from_secs(90);
+const AIRING_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+fn watch_airing(handle: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(AIRING_FIRST_DELAY).await;
+        loop {
+            let state = handle.state::<AppState>();
+            match state.check_airing().await {
+                Ok(found) => {
+                    for entry in found {
+                        announce(&handle, &entry);
+                    }
+                }
+                Err(error) => tracing::debug!("проверка расписания не удалась: {error}"),
+            }
+            tokio::time::sleep(AIRING_INTERVAL).await;
+        }
+    });
+}
+
+fn announce(handle: &tauri::AppHandle, entry: &anilume_core::Aired) {
+    use tauri_plugin_notification::NotificationExt;
+
+    let _ = handle
+        .notification()
+        .builder()
+        .title(entry.title.clone())
+        .body(format!("Вышла {} серия", entry.episode))
+        .show();
+
+    let _ = handle.emit(AIRED_EVENT, entry);
+}
 
 fn override_dir(variable: &str) -> Option<std::path::PathBuf> {
     let raw = std::env::var_os(variable)?;
@@ -29,6 +64,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -62,6 +98,7 @@ pub fn run() {
             });
 
             app.manage(state);
+            watch_airing(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -99,6 +136,8 @@ pub fn run() {
             commands::library_remove,
             commands::setting_get,
             commands::setting_set,
+            commands::notify_status,
+            commands::notify_set,
             commands::cache_stats,
             commands::cache_clear,
             commands::shikimori_status,

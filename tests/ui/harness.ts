@@ -181,6 +181,8 @@ export const FIXTURES: Record<string, unknown> = {
   shikimori_status: { configured: false, loggedIn: false, account: null },
   animelib_servers: { servers: [], selected: "main", hasToken: false },
 
+  notify_status: true,
+  notify_set: null,
   cache_stats: { entries: 128, bytes: 2_400_000 },
   cache_clear: 128,
 

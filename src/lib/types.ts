@@ -7,6 +7,12 @@ export interface SourceInfo {
   notes: string[];
 }
 
+export interface Aired {
+  shikimoriId: number;
+  title: string;
+  episode: number;
+}
+
 export interface Upcoming {
   card: DiscoverCard;
   episode: number;

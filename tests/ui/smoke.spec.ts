@@ -254,6 +254,8 @@ test("кэш каталога виден в настройках и чистит
   await page.goto("/");
 
   await page.getByRole("button", { name: "Настройки" }).click();
+  await expect(page.getByRole("heading", { name: "Новые серии" })).toBeVisible();
+  await expect(page.getByText("Уведомлять о новых сериях")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Кэш каталога" })).toBeVisible();
   await expect(page.getByText("128 записей")).toBeVisible();
   await expect(page.getByText("2.3 МБ")).toBeVisible();

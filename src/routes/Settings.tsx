@@ -1,6 +1,7 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
+import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { extractToken, formatBytes, plural } from "../lib/format";
@@ -20,6 +21,17 @@ export function Settings() {
     api.animelibServers(),
   );
   const [cacheRes, { refetch: refetchCache }] = createResource(() => api.cacheStats());
+  const [notifyRes, { refetch: refetchNotify }] = createResource(() => api.notifyStatus());
+  const notify = () => settled(notifyRes) ?? true;
+
+  const setNotify = async (on: boolean) => {
+    try {
+      await api.notifySet(on);
+      await refetchNotify();
+    } catch (error) {
+      reportError(error);
+    }
+  };
   const status = () => settled(statusRes);
   const animelib = () => settled(animelibRes);
   const cache = () => settled(cacheRes);
@@ -354,6 +366,21 @@ export function Settings() {
             </button>
           </div>
         </Show>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel__title">Новые серии</h2>
+        <p class="panel__hint">
+          Раз в час приложение сверяет расписание Shikimori с вашей библиотекой
+          и присылает системное уведомление, когда выходит серия того, что вы
+          смотрите или отложили. Работает только для тайтлов, у которых есть
+          связь с каталогом.
+        </p>
+
+        <div class="panel__row">
+          <span class="panel__rowlabel">Уведомлять о новых сериях</span>
+          <Toggle checked={notify()} onChange={(value) => void setNotify(value)} />
+        </div>
       </section>
 
       <section class="panel">

@@ -353,6 +353,19 @@ pub async fn setting_set(state: State<'_, AppState>, key: String, value: String)
 }
 
 #[tauri::command]
+pub async fn notify_status(state: State<'_, AppState>) -> Answer<bool> {
+    Ok(state.notifications_on())
+}
+
+#[tauri::command]
+pub async fn notify_set(state: State<'_, AppState>, on: bool) -> Answer<()> {
+    state
+        .db
+        .setting_set(crate::state::NOTIFY_SETTING, if on { "on" } else { "off" })?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn cache_stats(state: State<'_, AppState>) -> Answer<CacheStats> {
     Ok(state.db.cache_size()?)
 }

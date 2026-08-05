@@ -24,7 +24,7 @@ import { Search } from "./routes/Search";
 import { Settings } from "./routes/Settings";
 import { Title } from "./routes/Title";
 import { loadPrefs, restoreSourceConfig } from "./lib/prefs";
-import { checkForUpdate } from "./lib/api";
+import { api, checkForUpdate } from "./lib/api";
 import {
   ambient,
   canGoBack,
@@ -56,6 +56,15 @@ export function App() {
         "info",
         "Приложение перезапустится после установки",
         () => void update.install(),
+      );
+    });
+
+    void api.onEpisodeAired((aired) => {
+      pushToast(
+        `Вышла ${aired.episode} серия «${aired.title}»`,
+        "info",
+        "Нажмите, чтобы открыть",
+        () => navigate({ name: "title", query: aired.title }),
       );
     });
 

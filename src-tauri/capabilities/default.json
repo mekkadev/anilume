@@ -18,6 +18,7 @@
     "opener:allow-reveal-item-in-dir",
     "os:allow-platform",
     "dialog:allow-open",
+    "notification:default",
     "updater:default",
     "process:allow-restart"
   ]

@@ -1,13 +1,16 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anilume_core::{
-    Artworks, CoreError, Db, Discover, DownloadManager, ProxyHandle, Result, Shikimori,
-    SidecarClient, SidecarSpec,
+    newly_aired, watched_ids, Aired, Artworks, CoreError, Db, Discover, DownloadManager,
+    ProxyHandle, Result, Shikimori, SidecarClient, SidecarSpec,
 };
 use tokio::sync::Mutex;
 
 const CACHE_LIFETIME: i64 = 30 * 24 * 60 * 60;
+const SEEN_EPISODES: &str = "notify.seen";
+pub const NOTIFY_SETTING: &str = "notify.episodes";
 
 pub struct AppState {
     pub sidecar: Arc<SidecarClient>,
@@ -65,6 +68,43 @@ impl AppState {
         let proxied = self.proxy.proxied_url(&session, url);
         *current = Some(session);
         proxied
+    }
+
+    pub fn notifications_on(&self) -> bool {
+        !matches!(
+            self.db.setting_get(NOTIFY_SETTING).ok().flatten().as_deref(),
+            Some("off")
+        )
+    }
+
+    pub async fn check_airing(&self) -> Result<Vec<Aired>> {
+        if !self.notifications_on() {
+            return Ok(Vec::new());
+        }
+
+        let followed = watched_ids(
+            self.db
+                .library_list(None)?
+                .iter()
+                .map(|entry| (entry.status.as_str(), entry.shikimori_id))
+                .collect::<Vec<_>>(),
+        );
+        if followed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let calendar = self.discover.calendar().await?;
+        let seen: HashMap<i64, i64> = self
+            .db
+            .setting_get(SEEN_EPISODES)?
+            .and_then(|raw| serde_json::from_str(&raw).ok())
+            .unwrap_or_default();
+
+        let (found, next) = newly_aired(&calendar, &followed, &seen);
+        if let Ok(encoded) = serde_json::to_string(&next) {
+            self.db.setting_set(SEEN_EPISODES, &encoded)?;
+        }
+        Ok(found)
     }
 
     pub async fn close_playback(&self) {

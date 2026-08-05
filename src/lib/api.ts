@@ -20,6 +20,7 @@ import type {
   ShikiComment,
   ShikimoriStatus,
   SourceInfo,
+  Aired,
   CacheStats,
   SourceProbe,
   Upcoming,
@@ -32,6 +33,7 @@ import type {
 } from "./types";
 
 export const DOWNLOAD_EVENT = "anilume://download-progress";
+const AIRED_EVENT = "anilume://episode-aired";
 
 export function isAppError(value: unknown): value is AppError {
   return (
@@ -78,6 +80,10 @@ export const api = {
   anime: (handle: string) => call<AnimeDetail>("anime_get", { handle }),
 
   discoverCalendar: () => call<Upcoming[]>("discover_calendar"),
+
+  notifyStatus: () => call<boolean>("notify_status"),
+
+  notifySet: (on: boolean) => call<void>("notify_set", { on }),
 
   cacheStats: () => call<CacheStats>("cache_stats"),
 
@@ -212,6 +218,9 @@ export const api = {
 
   onDownloadProgress: (handler: (event: DownloadEvent) => void) =>
     listen<DownloadEvent>(DOWNLOAD_EVENT, (event) => handler(event.payload)),
+
+  onEpisodeAired: (handler: (event: Aired) => void) =>
+    listen<Aired>(AIRED_EVENT, (event) => handler(event.payload)),
 };
 
 export async function checkForUpdate(): Promise<
