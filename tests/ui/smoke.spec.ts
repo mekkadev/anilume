@@ -58,7 +58,8 @@ test("страница аниме показывает всё, что обеща
   await page.goto("/");
   await page.locator(".card").first().click();
 
-  await expect(page.locator(".title-poster img")).toBeVisible();
+  await expect(page.locator(".title-poster img")).toHaveAttribute("src", /xl-/);
+  await expect(page.locator(".row .card img").first()).toHaveAttribute("src", /l-/);
   await expect(page.locator(".title-info__name")).toBeVisible();
   const info = page.locator(".title-info");
   await expect(info.locator(".score-block .score")).toBeVisible();

@@ -14,7 +14,7 @@ import { Icon } from "../components/Icon";
 import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
-import { bannerFor, coverFor, ensureArt } from "../lib/art";
+import { bannerFor, coverFor, ensureArt, posterFor } from "../lib/art";
 import { pickMatch } from "../lib/match";
 import { pending, settled } from "../lib/resource";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
@@ -322,7 +322,7 @@ export function Title(props: {
 
   const heroArt = () => shiki()?.art[0] ?? bannerFor(shiki()?.id) ?? null;
   const poster = () =>
-    coverFor(shiki()?.id, shiki()?.poster ?? detail()?.poster ?? null);
+    posterFor(shiki()?.id, shiki()?.poster ?? detail()?.poster ?? null);
 
   createEffect(() => {
     const ids = [

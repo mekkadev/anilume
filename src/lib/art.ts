@@ -12,7 +12,13 @@ export function artFor(malId: number | null | undefined) {
 }
 
 export function coverFor(malId: number | null | undefined, fallback: string | null) {
-  return artFor(malId)?.cover ?? fallback;
+  const found = artFor(malId);
+  return found?.thumb ?? found?.cover ?? fallback;
+}
+
+export function posterFor(malId: number | null | undefined, fallback: string | null) {
+  const found = artFor(malId);
+  return found?.cover ?? found?.thumb ?? fallback;
 }
 
 export function bannerFor(malId: number | null | undefined) {

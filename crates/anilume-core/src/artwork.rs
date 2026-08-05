@@ -22,7 +22,7 @@ const QUERY: &str = "query ($ids: [Int]) {
     media(idMal_in: $ids, type: ANIME) {
       idMal
       bannerImage
-      coverImage { extraLarge }
+      coverImage { extraLarge large }
     }
   }
 }";
@@ -32,6 +32,8 @@ const QUERY: &str = "query ($ids: [Int]) {
 pub struct Artwork {
     pub mal_id: i64,
     pub cover: Option<String>,
+    #[serde(default)]
+    pub thumb: Option<String>,
     pub banner: Option<String>,
 }
 
@@ -39,6 +41,8 @@ pub struct Artwork {
 struct RawCover {
     #[serde(rename = "extraLarge")]
     extra_large: Option<String>,
+    #[serde(default)]
+    large: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,9 +79,14 @@ fn clean(value: Option<String>) -> Option<String> {
 
 fn artwork_from_raw(raw: RawMedia) -> Option<Artwork> {
     let mal_id = raw.id_mal?;
+    let cover = raw.cover_image;
+    let large = clean(cover.as_ref().and_then(|item| item.extra_large.clone()));
+    let small = clean(cover.and_then(|item| item.large));
+
     Some(Artwork {
         mal_id,
-        cover: clean(raw.cover_image.and_then(|cover| cover.extra_large)),
+        thumb: small.clone().or_else(|| large.clone()),
+        cover: large.or(small),
         banner: clean(raw.banner_image),
     })
 }
@@ -137,6 +146,7 @@ impl Artworks {
                     cache.entry(*id).or_insert_with(|| Artwork {
                         mal_id: *id,
                         cover: None,
+                        thumb: None,
                         banner: None,
                     });
                 }
@@ -239,8 +249,32 @@ mod tests {
         Artwork {
             mal_id: id,
             cover: Some("https://cdn/c.jpg".into()),
+            thumb: Some("https://cdn/t.jpg".into()),
             banner: None,
         }
+    }
+
+    #[test]
+    fn a_card_gets_the_lighter_cover_and_a_page_the_heavy_one() {
+        let raw: RawMedia = serde_json::from_str(
+            r#"{"idMal":16498,"bannerImage":"https://cdn/b.jpg",
+                "coverImage":{"extraLarge":"https://cdn/xl.jpg","large":"https://cdn/l.jpg"}}"#,
+        )
+        .unwrap();
+
+        let found = artwork_from_raw(raw).unwrap();
+        assert_eq!(found.cover.as_deref(), Some("https://cdn/xl.jpg"));
+        assert_eq!(found.thumb.as_deref(), Some("https://cdn/l.jpg"));
+    }
+
+    #[test]
+    fn a_missing_size_falls_back_to_the_other_one() {
+        let raw: RawMedia =
+            serde_json::from_str(r#"{"idMal":1,"coverImage":{"extraLarge":"https://cdn/xl.jpg"}}"#)
+                .unwrap();
+
+        let found = artwork_from_raw(raw).unwrap();
+        assert_eq!(found.thumb.as_deref(), Some("https://cdn/xl.jpg"));
     }
 
     #[test]

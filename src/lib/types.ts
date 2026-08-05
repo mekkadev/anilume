@@ -292,5 +292,6 @@ export interface ShikiComment {
 export interface Artwork {
   malId: number;
   cover: string | null;
+  thumb: string | null;
   banner: string | null;
 }

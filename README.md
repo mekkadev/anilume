@@ -156,6 +156,11 @@ id Shikimori и MAL совпадают, так что промежуточног
 отдаёт до пятидесяти тайтлов сразу, ответы кешируются на диске на месяц,
 запросы разведены на 800 мс.
 
+Размеров запрашивается два. `extraLarge` весит 70–80 КБ и идёт только на
+крупный постер страницы аниме; в сетки карточек уходит `large` — те же
+пропорции при 20–28 КБ. На главной с четырьмя десятками карточек это разница
+между тремя мегабайтами и одним.
+
 Широкий арт для героя на главной и шапки страницы аниме — это кадры Shikimori
 (1920×1080), а если их нет, баннер AniList (1900×400). Когда нет ни того ни
 другого, вместо растянутого постера показывается он же, но размытый: честнее
@@ -551,6 +556,10 @@ the size on each side. matching is by myanimelist id, and for anime the shikimor
 and mal ids are the same, so no intermediate search is needed. one request covers
 fifty titles, answers are cached on disk for a month, and requests are spaced
 800ms apart.
+
+two sizes are requested. `extraLarge` weighs 70-80 kb and is used only for the
+big poster on an anime page; grids get `large` — same proportions at 20-28 kb.
+on a home screen with forty cards that is three megabytes against one.
 
 the wide art behind the home hero and the title page header is a shikimori
 screenshot (1920×1080), or an anilist banner (1900×400) when there is none. with

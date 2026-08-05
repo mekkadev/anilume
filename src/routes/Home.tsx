@@ -14,7 +14,7 @@ import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
-import { bannerFor, coverFor, ensureArt } from "../lib/art";
+import { bannerFor, ensureArt, posterFor } from "../lib/art";
 import { broke, pending, settled } from "../lib/resource";
 import { formatTime, relativeTime } from "../lib/format";
 import { activeSource, navigate, setAmbient, sourceName } from "../lib/store";
@@ -111,7 +111,7 @@ export function Home() {
     void loadDetail(current);
     const next = heroes()[heroIndex() + 1];
     if (next) void loadDetail(next);
-    setAmbient(heroArt() ?? coverFor(current.id, current.poster));
+    setAmbient(heroArt() ?? posterFor(current.id, current.poster));
   });
 
   onMount(() => {
@@ -147,8 +147,8 @@ export function Home() {
               <Show
                 when={heroArt()}
                 fallback={
-                  <Show when={coverFor(current().id, current().poster)}>
-                    <HeroArt src={coverFor(current().id, current().poster)!} />
+                  <Show when={posterFor(current().id, current().poster)}>
+                    <HeroArt src={posterFor(current().id, current().poster)!} />
                   </Show>
                 }
               >

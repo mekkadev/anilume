@@ -161,7 +161,12 @@ export const FIXTURES: Record<string, unknown> = {
       duration: null,
     },
   ],
-  artwork_lookup: [],
+  artwork_lookup: shiki.map((card) => ({
+    malId: card.id,
+    cover: poster(`xl-${card.id}`),
+    thumb: poster(`l-${card.id}`),
+    banner: null,
+  })),
 
   continue_watching: [],
   progress_for_anime: [],
@@ -215,6 +220,11 @@ export const FIXTURES: Record<string, unknown> = {
   setting_get: null,
   setting_set: null,
 };
+
+const PIXEL = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 export interface HarnessOptions {
   stalled?: string[];
@@ -293,7 +303,7 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
   }, payload);
 
   await page.route("**stub.local/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: Buffer.alloc(0) }),
+    route.fulfill({ status: 200, contentType: "image/png", body: PIXEL }),
   );
 }
 
