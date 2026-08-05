@@ -10,10 +10,17 @@ import {
 } from "../lib/store";
 import { Icon, type IconName } from "./Icon";
 
-type SimpleRoute = "home" | "library" | "history" | "downloads" | "settings";
+type SimpleRoute =
+  | "home"
+  | "discover"
+  | "library"
+  | "history"
+  | "downloads"
+  | "settings";
 
 const NAV: { name: SimpleRoute; label: string; icon: IconName }[] = [
   { name: "home", label: "Главная", icon: "home" },
+  { name: "discover", label: "Каталог", icon: "sliders" },
   { name: "library", label: "Библиотека", icon: "library" },
   { name: "history", label: "История", icon: "clock" },
   { name: "downloads", label: "Загрузки", icon: "download" },

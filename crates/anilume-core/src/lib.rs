@@ -1,4 +1,5 @@
 pub mod db;
+pub mod discover;
 pub mod downloads;
 pub mod error;
 pub mod proxy;
@@ -6,6 +7,7 @@ pub mod shikimori;
 pub mod sidecar;
 
 pub use db::{ContinueItem, Db, LibraryEntry, WatchProgress};
+pub use discover::{Discover, DiscoverCard, DiscoverOptions, DiscoverQuery};
 pub use downloads::{DownloadEvent, DownloadItem, DownloadManager, DownloadRequest};
 pub use error::{CoreError, ErrorPayload, Result};
 pub use proxy::ProxyHandle;

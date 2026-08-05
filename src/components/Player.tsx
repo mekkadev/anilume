@@ -14,7 +14,7 @@ import { formatTime, qualityLabel } from "../lib/format";
 import { pickQualityIndex, qualityPref } from "../lib/prefs";
 import { closePlayer, pushToast, reportError } from "../lib/store";
 import type { PlaybackRequest } from "../lib/store";
-import type { VideoInfo, WatchProgress } from "../lib/types";
+import type { StudioInfo, VideoInfo, WatchProgress } from "../lib/types";
 import { Icon } from "./Icon";
 
 let HlsModule: typeof HlsPlayer | null = null;
@@ -26,7 +26,8 @@ async function loadHls() {
 
 const CONTROLS_TIMEOUT = 2600;
 const PROGRESS_INTERVAL = 5000;
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const SUBTITLE_TYPES = ".vtt,.srt,.txt";
 
 export function Player(props: { request: PlaybackRequest }) {
   let video!: HTMLVideoElement;
@@ -34,6 +35,7 @@ export function Player(props: { request: PlaybackRequest }) {
   let hls: HlsPlayer | null = null;
   let hideTimer: number | undefined;
   let saveTimer: number | undefined;
+  let subtitleInput!: HTMLInputElement;
 
   const [episodeIndex, setEpisodeIndex] = createSignal(props.request.episodeIndex);
   const [videos, setVideos] = createSignal<VideoInfo[]>(props.request.videos);
@@ -50,7 +52,12 @@ export function Player(props: { request: PlaybackRequest }) {
   const [speed, setSpeed] = createSignal(1);
   const [fullscreen, setFullscreen] = createSignal(false);
   const [controlsVisible, setControlsVisible] = createSignal(true);
-  const [menu, setMenu] = createSignal<"quality" | "speed" | "tracks" | null>(null);
+  const [menu, setMenu] = createSignal<"quality" | "speed" | "tracks" | "dub" | null>(
+    null,
+  );
+  const [dubs, setDubs] = createSignal<StudioInfo[]>([]);
+  const [externalSubs, setExternalSubs] = createSignal<{ name: string; url: string }[]>([]);
+  const [externalSub, setExternalSub] = createSignal(-1);
   const [audioTracks, setAudioTracks] = createSignal<{ name: string; lang?: string }[]>([]);
   const [audioTrack, setAudioTrack] = createSignal(-1);
   const [subtitleTracks, setSubtitleTracks] = createSignal<{ name: string; lang?: string }[]>([]);
@@ -103,6 +110,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
       const applySeek = () => {
         if (seekTo > 0) video.currentTime = seekTo;
+        video.playbackRate = speed();
         void video.play().catch(() => setPlaying(false));
       };
 
@@ -183,12 +191,33 @@ export function Player(props: { request: PlaybackRequest }) {
     void api.saveProgress(progress).catch(() => undefined);
   }
 
+  function keepQuality(nextVideos: VideoInfo[], previous: number | undefined) {
+    const same = nextVideos.findIndex((item) => item.quality === previous);
+    return same >= 0 ? same : pickQualityIndex(nextVideos, qualityPref());
+  }
+
+  async function loadDubs() {
+    const info = episode();
+    if (!info || props.request.offline) {
+      setDubs([]);
+      return;
+    }
+
+    try {
+      const { studios } = await api.studios(info.handle);
+      setDubs(studios);
+    } catch {
+      setDubs([]);
+    }
+  }
+
   async function switchEpisode(index: number) {
     const target = props.request.episodes[index];
     if (!target) return;
 
     persist(true);
     setSwitchingTo(index);
+    const previousQuality = activeVideo()?.quality;
     try {
       const { studios } = await api.studios(target.handle);
       if (studios.length === 0) {
@@ -206,17 +235,47 @@ export function Player(props: { request: PlaybackRequest }) {
 
       setEpisodeIndex(index);
       setStudioTitle(preferred.title);
+      setDubs(studios);
       setVideos(nextVideos);
       setCurrent(0);
       setDuration(0);
 
-      const sameQuality = nextVideos.findIndex(
-        (item) => item.quality === activeVideo()?.quality,
-      );
-      const nextIndex =
-        sameQuality >= 0 ? sameQuality : pickQualityIndex(nextVideos, qualityPref());
+      const nextIndex = keepQuality(nextVideos, previousQuality);
       setQualityIndex(nextIndex);
       await load(nextVideos[nextIndex]!, 0);
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setSwitchingTo(null);
+    }
+  }
+
+  async function switchDub(studio: StudioInfo) {
+    if (studio.title === studioTitle()) {
+      setMenu(null);
+      return;
+    }
+
+    const resumeAt = video.currentTime;
+    const wasPlaying = !video.paused;
+    const previousQuality = activeVideo()?.quality;
+    setMenu(null);
+    setSwitchingTo(episodeIndex());
+
+    try {
+      const { videos: nextVideos } = await api.videos(studio.handle);
+      if (nextVideos.length === 0) {
+        pushToast("Озвучка не отдала видео", "error");
+        return;
+      }
+
+      setStudioTitle(studio.title);
+      setVideos(nextVideos);
+
+      const nextIndex = keepQuality(nextVideos, previousQuality);
+      setQualityIndex(nextIndex);
+      await load(nextVideos[nextIndex]!, resumeAt);
+      if (!wasPlaying) video.pause();
     } catch (error) {
       reportError(error);
     } finally {
@@ -241,12 +300,63 @@ export function Player(props: { request: PlaybackRequest }) {
     setAudioTrack(index);
   }
 
+  function showExternal(name: string | null) {
+    const owned = new Set(externalSubs().map((item) => item.name));
+    for (const track of Array.from(video.textTracks)) {
+      if (!owned.has(track.label)) continue;
+      track.mode = track.label === name ? "showing" : "disabled";
+    }
+  }
+
   function chooseSubtitle(index: number) {
     if (hls) {
       hls.subtitleTrack = index;
       hls.subtitleDisplay = index >= 0;
     }
     setSubtitleTrack(index);
+    setExternalSub(-1);
+    showExternal(null);
+  }
+
+  function chooseExternalSubtitle(index: number) {
+    if (hls) {
+      hls.subtitleTrack = -1;
+      hls.subtitleDisplay = false;
+    }
+    setSubtitleTrack(-1);
+    setExternalSub(index);
+    showExternal(externalSubs()[index]?.name ?? null);
+  }
+
+  function toVtt(text: string) {
+    const normalized = text.replace(/\r/g, "");
+    if (normalized.trimStart().startsWith("WEBVTT")) return normalized;
+    return `WEBVTT\n\n${normalized.replace(
+      /(\d{2}:\d{2}:\d{2}),(\d{1,3})/g,
+      "$1.$2",
+    )}`;
+  }
+
+  async function addSubtitleFile(file: File) {
+    if (/\.(ass|ssa)$/i.test(file.name)) {
+      pushToast(
+        "Формат ASS не поддерживается",
+        "error",
+        "Сконвертируйте дорожку в SRT или VTT",
+      );
+      return;
+    }
+
+    try {
+      const url = URL.createObjectURL(
+        new Blob([toVtt(await file.text())], { type: "text/vtt" }),
+      );
+      const name = file.name.replace(/\.[^.]+$/, "");
+      setExternalSubs([...externalSubs(), { name, url }]);
+      queueMicrotask(() => chooseExternalSubtitle(externalSubs().length - 1));
+    } catch (error) {
+      reportError(error);
+    }
   }
 
   function togglePlay() {
@@ -311,6 +421,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
     await load(activeVideo()!, props.request.startAt);
     revealControls();
+    void loadDubs();
 
     saveTimer = window.setInterval(() => {
       if (!video.paused) persist();
@@ -369,6 +480,7 @@ export function Player(props: { request: PlaybackRequest }) {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       window.clearTimeout(hideTimer);
       window.clearInterval(saveTimer);
+      for (const track of externalSubs()) URL.revokeObjectURL(track.url);
       hls?.destroy();
     });
   });
@@ -424,6 +536,24 @@ export function Player(props: { request: PlaybackRequest }) {
         onVolumeChange={(event) => {
           setVolume(event.currentTarget.volume);
           setMuted(event.currentTarget.muted);
+        }}
+      >
+        <For each={externalSubs()}>
+          {(track) => (
+            <track kind="subtitles" label={track.name} src={track.url} default={false} />
+          )}
+        </For>
+      </video>
+
+      <input
+        ref={subtitleInput}
+        type="file"
+        accept={SUBTITLE_TYPES}
+        hidden
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void addSubtitleFile(file);
         }}
       />
 
@@ -574,67 +704,116 @@ export function Player(props: { request: PlaybackRequest }) {
             </Show>
           </div>
 
-          <Show when={audioTracks().length > 1 || subtitleTracks().length > 0}>
+          <Show when={dubs().length > 1}>
             <div class="menu">
               <button
                 class="player-btn"
-                title="Дорожки и субтитры"
-                onClick={() => setMenu(menu() === "tracks" ? null : "tracks")}
+                title="Озвучка"
+                onClick={() => setMenu(menu() === "dub" ? null : "dub")}
               >
-                <Icon name="subtitles" size={18} />
+                <Icon name="audio" size={19} />
               </button>
-              <Show when={menu() === "tracks"}>
+              <Show when={menu() === "dub"}>
                 <div class="menu__backdrop" onClick={() => setMenu(null)} />
-                <div class="menu__list menu__list--up menu__list--wide">
-                  <Show when={audioTracks().length > 1}>
-                    <div class="menu__label">Звук</div>
-                    <For each={audioTracks()}>
-                      {(track, index) => (
-                        <button
-                          class="menu__item"
-                          data-active={audioTrack() === index()}
-                          onClick={() => chooseAudio(index())}
-                        >
-                          {track.name}
-                          <Show when={audioTrack() === index()}>
-                            <Icon name="check" size={14} />
-                          </Show>
-                        </button>
-                      )}
-                    </For>
-                  </Show>
-
-                  <Show when={subtitleTracks().length > 0}>
-                    <div class="menu__label">Субтитры</div>
-                    <button
-                      class="menu__item"
-                      data-active={subtitleTrack() < 0}
-                      onClick={() => chooseSubtitle(-1)}
-                    >
-                      Выключены
-                      <Show when={subtitleTrack() < 0}>
-                        <Icon name="check" size={14} />
-                      </Show>
-                    </button>
-                    <For each={subtitleTracks()}>
-                      {(track, index) => (
-                        <button
-                          class="menu__item"
-                          data-active={subtitleTrack() === index()}
-                          onClick={() => chooseSubtitle(index())}
-                        >
-                          {track.name}
-                          <Show when={subtitleTrack() === index()}>
-                            <Icon name="check" size={14} />
-                          </Show>
-                        </button>
-                      )}
-                    </For>
-                  </Show>
+                <div class="menu__list menu__list--up menu__list--wide menu__list--tall">
+                  <div class="menu__label">Озвучка</div>
+                  <For each={dubs()}>
+                    {(studio) => (
+                      <button
+                        class="menu__item"
+                        data-active={studio.title === studioTitle()}
+                        onClick={() => void switchDub(studio)}
+                      >
+                        {studio.title}
+                        <Show when={studio.title === studioTitle()}>
+                          <Icon name="check" size={14} />
+                        </Show>
+                      </button>
+                    )}
+                  </For>
                 </div>
               </Show>
             </div>
           </Show>
+
+          <div class="menu">
+            <button
+              class="player-btn"
+              title="Дорожки и субтитры"
+              onClick={() => setMenu(menu() === "tracks" ? null : "tracks")}
+            >
+              <Icon name="subtitles" size={18} />
+            </button>
+            <Show when={menu() === "tracks"}>
+              <div class="menu__backdrop" onClick={() => setMenu(null)} />
+              <div class="menu__list menu__list--up menu__list--wide">
+                <Show when={audioTracks().length > 1}>
+                  <div class="menu__label">Звук</div>
+                  <For each={audioTracks()}>
+                    {(track, index) => (
+                      <button
+                        class="menu__item"
+                        data-active={audioTrack() === index()}
+                        onClick={() => chooseAudio(index())}
+                      >
+                        {track.name}
+                        <Show when={audioTrack() === index()}>
+                          <Icon name="check" size={14} />
+                        </Show>
+                      </button>
+                    )}
+                  </For>
+                </Show>
+
+                <div class="menu__label">Субтитры</div>
+                <button
+                  class="menu__item"
+                  data-active={subtitleTrack() < 0 && externalSub() < 0}
+                  onClick={() => chooseSubtitle(-1)}
+                >
+                  Выключены
+                  <Show when={subtitleTrack() < 0 && externalSub() < 0}>
+                    <Icon name="check" size={14} />
+                  </Show>
+                </button>
+                <For each={subtitleTracks()}>
+                  {(track, index) => (
+                    <button
+                      class="menu__item"
+                      data-active={subtitleTrack() === index()}
+                      onClick={() => chooseSubtitle(index())}
+                    >
+                      {track.name}
+                      <Show when={subtitleTrack() === index()}>
+                        <Icon name="check" size={14} />
+                      </Show>
+                    </button>
+                  )}
+                </For>
+                <For each={externalSubs()}>
+                  {(track, index) => (
+                    <button
+                      class="menu__item"
+                      data-active={externalSub() === index()}
+                      onClick={() => chooseExternalSubtitle(index())}
+                    >
+                      {track.name}
+                      <Show when={externalSub() === index()}>
+                        <Icon name="check" size={14} />
+                      </Show>
+                    </button>
+                  )}
+                </For>
+                <button
+                  class="menu__item menu__item--muted"
+                  onClick={() => subtitleInput.click()}
+                >
+                  Открыть файл…
+                  <Icon name="plus" size={14} />
+                </button>
+              </div>
+            </Show>
+          </div>
 
           <button class="player-btn" onClick={() => void togglePip()} title="Картинка в картинке (P)">
             <Icon name="pip" size={19} />

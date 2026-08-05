@@ -7,6 +7,7 @@ import type { AnimeCard, SourceInfo, VideoInfo } from "./types";
 export type Route =
   | { name: "home" }
   | { name: "search"; query: string }
+  | { name: "discover" }
   | { name: "title"; card: AnimeCard }
   | { name: "library" }
   | { name: "history" }

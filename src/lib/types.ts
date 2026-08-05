@@ -32,6 +32,40 @@ export interface AnimeCard {
   meta: AnimeMeta;
 }
 
+export interface DiscoverCard {
+  id: number;
+  title: string;
+  originalTitle: string;
+  poster: string | null;
+  score: number | null;
+  kind: string | null;
+  status: string | null;
+  year: number | null;
+  episodes: number | null;
+}
+
+export interface DiscoverNamed {
+  id: number;
+  name: string;
+}
+
+export interface DiscoverOptions {
+  genres: DiscoverNamed[];
+  studios: DiscoverNamed[];
+}
+
+export interface DiscoverQuery {
+  query?: string;
+  genres?: number[];
+  studios?: number[];
+  kinds?: string[];
+  status?: string | null;
+  yearFrom?: number | null;
+  yearTo?: number | null;
+  order?: string;
+  page?: number;
+}
+
 export interface EpisodeInfo {
   handle: string;
   ordinal: number;

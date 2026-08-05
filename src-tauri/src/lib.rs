@@ -60,6 +60,8 @@ pub fn run() {
             commands::animelib_servers,
             commands::episode_studios,
             commands::studio_videos,
+            commands::discover_options,
+            commands::discover_search,
             commands::skip_times,
             commands::playback_open,
             commands::playback_close,

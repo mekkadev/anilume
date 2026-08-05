@@ -411,6 +411,12 @@
   background: color-mix(in srgb, var(--accent) 92%, black);
 }
 
+.badge--status {
+  top: 7px;
+  left: 7px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
 .badge--score {
   top: 7px;
   right: 7px;

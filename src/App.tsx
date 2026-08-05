@@ -4,6 +4,7 @@ import { Icon } from "./components/Icon";
 import { Player } from "./components/Player";
 import { Sidebar } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
+import { Discover } from "./routes/Discover";
 import { Downloads } from "./routes/Downloads";
 import { Home } from "./routes/Home";
 import { History } from "./routes/History";
@@ -136,6 +137,9 @@ export function App() {
               </Match>
               <Match when={matchRoute(route(), "search")}>
                 {(current) => <Search query={current().query} />}
+              </Match>
+              <Match when={matchRoute(route(), "discover")}>
+                <Discover />
               </Match>
               <Match when={matchRoute(route(), "title")}>
                 {(current) => <Title card={current().card} />}

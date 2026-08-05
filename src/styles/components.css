@@ -964,3 +964,117 @@
   color: var(--ink-3);
   box-shadow: inset 0 0 0 1px var(--rule);
 }
+
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.filters__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+
+.filters__chips .chip {
+  transition: background var(--fast) var(--ease-out);
+}
+
+.filters__chips .chip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--control-h-lg);
+  padding: 0 8px 0 10px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-control);
+  font-size: var(--text-body);
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background var(--fast) var(--ease-out), box-shadow var(--fast) var(--ease-out);
+}
+
+.filter:hover {
+  background: var(--fill-hover);
+}
+
+.filter svg {
+  color: var(--ink-3);
+}
+
+.filter[data-active="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+.filter[data-active="true"] svg {
+  color: currentColor;
+}
+
+.filter__value {
+  font-weight: 550;
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter[data-active="true"] .filter__label {
+  opacity: 0.72;
+}
+
+.menu__search {
+  width: 100%;
+  height: var(--control-h-lg);
+  margin-bottom: 4px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  font-size: var(--text-body);
+  color: var(--ink);
+  user-select: text;
+}
+
+.menu__search::placeholder {
+  color: var(--ink-3);
+}
+
+.menu__search::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.menu__scroll {
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu__empty {
+  padding: 10px 8px;
+  font-size: var(--text-callout);
+  color: var(--ink-3);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.menu__scroll--short {
+  max-height: 158px;
+}
