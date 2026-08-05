@@ -63,6 +63,26 @@ const LIBRARY_LABELS: Record<LibraryStatus, string> = {
   dropped: "Брошено",
 };
 
+const PLAYER_NAMES: Record<string, string> = {
+  "aniboom.one": "Aniboom",
+  "kodik.info": "Kodik",
+  "kodikplayer.com": "Kodik",
+  "player.aksor.tv": "Aksor",
+  "aksor.tv": "Aksor",
+  "video.sibnet.ru": "Sibnet",
+  "sibnet.ru": "Sibnet",
+  "csst.online": "CSST",
+  "sovetromantica.com": "SovetRomantica",
+  "vkvideo.ru": "VK",
+  "vk.com": "VK",
+  "my.mail.ru": "Mail.ru",
+};
+
+function playerName(host: string) {
+  const clean = host.replace(/^www\./, "").toLowerCase();
+  return PLAYER_NAMES[clean] ?? clean;
+}
+
 function studioSettingKey(source: string, animeKey: string) {
   return `studio:${source}:${animeKey}`;
 }
@@ -1021,12 +1041,10 @@ export function Title(props: {
                             onClick={() => chooseDub(studio)}
                           >
                             <span class="dub__name">{studio.title}</span>
-                            <Show
-                              when={height()}
-                              fallback={<span class="dub__player">{studio.player}</span>}
-                            >
+                            <Show when={height()}>
                               <span class="dub__quality">{qualityLabel(height()!)}</span>
                             </Show>
+                            <span class="dub__player">{playerName(studio.player)}</span>
                             <Show when={selectedDub() === studio.title}>
                               <Icon name="check" size={14} />
                             </Show>

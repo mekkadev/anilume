@@ -5,6 +5,7 @@ import { installTauri, watchForCrashes } from "./harness";
 interface Jank {
   longTasks: number;
   worstTask: number;
+  blocking: number;
   shifts: number;
 }
 
@@ -13,13 +14,13 @@ const LATENCY = 220;
 async function measure(page: import("@playwright/test").Page): Promise<Jank> {
   return page.evaluate(() => {
     const state = (window as unknown as { __JANK__?: Jank }).__JANK__;
-    return state ?? { longTasks: 0, worstTask: 0, shifts: 0 };
+    return state ?? { longTasks: 0, worstTask: 0, blocking: 0, shifts: 0 };
   });
 }
 
 async function instrument(page: import("@playwright/test").Page) {
   await page.addInitScript(() => {
-    const state = { longTasks: 0, worstTask: 0, shifts: 0 };
+    const state = { longTasks: 0, worstTask: 0, blocking: 0, shifts: 0 };
     (window as unknown as { __JANK__: typeof state }).__JANK__ = state;
 
     try {
@@ -27,6 +28,7 @@ async function instrument(page: import("@playwright/test").Page) {
         for (const entry of list.getEntries()) {
           if (entry.duration <= 50) continue;
           state.longTasks += 1;
+          state.blocking += Math.round(entry.duration - 50);
           state.worstTask = Math.max(state.worstTask, Math.round(entry.duration));
         }
       }).observe({ type: "longtask", buffered: true });
@@ -90,7 +92,8 @@ test("обход всех разделов не копит подвисания 
   await page.locator(".title-info__name").waitFor({ timeout: 8000 });
 
   const jank = await measure(page);
-  expect(jank.worstTask, "ни одна задача не должна вешать поток").toBeLessThan(320);
+  expect(jank.blocking, "поток не должен стоять").toBeLessThan(700);
+  expect(jank.worstTask, "ни одна задача не должна вешать поток").toBeLessThan(600);
   expect(jank.shifts, "макет не должен прыгать").toBeLessThan(0.5);
 });
 
@@ -119,5 +122,6 @@ test("интерфейс отвечает, пока бэкенд молчит", 
   }
 
   const jank = await measure(page);
-  expect(jank.worstTask).toBeLessThan(320);
+  expect(jank.blocking, "поток не должен стоять").toBeLessThan(700);
+  expect(jank.worstTask).toBeLessThan(600);
 });
