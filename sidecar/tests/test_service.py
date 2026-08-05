@@ -1,5 +1,7 @@
 import pytest
 
+from anilume_sidecar import settings
+
 from anilume_sidecar.protocol import (
     HANDLE_EXPIRED,
     INVALID_PARAMS,
@@ -187,3 +189,25 @@ async def test_probe_requires_a_list(service):
     with pytest.raises(RpcError) as exc:
         await service.catalog_probe({"items": "нет"})
     assert exc.value.code == INVALID_PARAMS
+
+
+async def test_animelib_loses_priority_without_a_token(service):
+    settings.set_section("animelib", {})
+
+    listed = await service.sources_list({})
+    animelib = next(s for s in listed["sources"] if s["key"] == "animelib")
+
+    assert animelib["priority"] == 45
+    assert "720p" in animelib["notes"][0]
+    assert listed["default"] == "yummy_anime"
+
+
+async def test_animelib_leads_again_once_a_token_is_set(service):
+    settings.set_section("animelib", {"token": "abc"})
+
+    listed = await service.sources_list({})
+    animelib = next(s for s in listed["sources"] if s["key"] == "animelib")
+
+    assert animelib["priority"] == 10
+    assert listed["default"] == "animelib"
+    settings.set_section("animelib", {})

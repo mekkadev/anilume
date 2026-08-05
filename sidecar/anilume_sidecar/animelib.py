@@ -23,6 +23,7 @@ FALLBACK_SERVERS = (
 )
 
 SEARCH_LIMIT = 30
+PROBE_TIMEOUT = 6.0
 DETAIL_FIELDS = (
     "background",
     "eng_name",
@@ -111,6 +112,47 @@ def _text(value: Any) -> str:
         if isinstance(nested, str) and nested.strip():
             return nested.strip()
     return ""
+
+RECAP_MARKS = ("рекап", "recap", "обзор за", "in minutes", " pv", "промо", "трейлер")
+
+def _names(payload: dict[str, Any]) -> list[str]:
+    found = []
+    for key in ("rus_name", "name", "eng_name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            found.append(value.strip().lower())
+    return found
+
+def relevance(payload: dict[str, Any], query: str) -> tuple[int, int, float]:
+    needle = query.strip().lower()
+    names = _names(payload)
+
+    if any(name == needle for name in names):
+        rank = 0
+    elif any(name.startswith(needle) for name in names):
+        rank = 1
+    elif any(needle in name for name in names):
+        rank = 2
+    else:
+        rank = 3
+
+    if any(mark in name for name in names for mark in RECAP_MARKS):
+        rank += 4
+
+    rating = payload.get("rating")
+    votes = 0
+    if isinstance(rating, dict):
+        try:
+            votes = int(rating.get("votes") or 0)
+        except (TypeError, ValueError):
+            votes = 0
+
+    try:
+        score = float(payload.get("shiki_rate") or 0)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    return (rank, -votes, -score)
 
 def _title(payload: dict[str, Any]) -> str:
     for key in ("rus_name", "name", "eng_name"):
@@ -236,7 +278,8 @@ class Client:
 
     async def search(self, query: str) -> list[Card]:
         data = await self._request("/anime", {"q": query, "limit": SEARCH_LIMIT})
-        return [Card(self, item) for item in (data or [])]
+        ranked = sorted(data or [], key=lambda item: relevance(item, query))
+        return [Card(self, item) for item in ranked]
 
     async def ongoing(self) -> list[Card]:
         data = await self._request(
@@ -275,14 +318,36 @@ class Client:
             bases = [url for _, url in FALLBACK_SERVERS]
 
         headers = {"Referer": f"{SITE_ORIGIN}/", "User-Agent": USER_AGENT}
-        videos: list[Video] = []
-        for entry in video.get("quality") or []:
-            href = entry.get("href")
-            quality = entry.get("quality")
-            if not href or not quality:
-                continue
-            videos.append(Video("mp4", int(quality), video_url(bases[0], href), headers))
-        return videos
+        entries = [
+            (int(entry["quality"]), entry["href"])
+            for entry in (video.get("quality") or [])
+            if entry.get("href") and entry.get("quality")
+        ]
+        if not entries:
+            return []
+
+        entries.sort(reverse=True)
+        base = await self._working_base(bases, entries[0][1])
+
+        return [
+            Video("mp4", quality, video_url(base, href), headers)
+            for quality, href in entries
+        ]
+
+    async def _working_base(self, bases: list[str], href: str) -> str:
+        headers = {"Referer": f"{SITE_ORIGIN}/", "User-Agent": USER_AGENT}
+        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT, follow_redirects=True) as http:
+            for base in bases:
+                url = video_url(base, href)
+                try:
+                    response = await http.get(
+                        url, headers={**headers, "Range": "bytes=0-1"}
+                    )
+                except Exception:
+                    continue
+                if response.status_code < 400:
+                    return base
+        return bases[0]
 
     async def kodik_videos(self, url: str) -> list[Video]:
         from anicli_api.player.kodik import Kodik

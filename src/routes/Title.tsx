@@ -144,9 +144,18 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     if (!found) setMissing(true);
   });
 
+  const empty = (key: string) => {
+    const probe = probes()[key];
+    return Boolean(probe) && probe!.episodes === 0;
+  };
+
   const available = () => {
     const order = new Map(sources().map((item) => [item.key, item.priority ?? 50]));
     return Object.values(candidates()).sort((a, b) => {
+      const ea = empty(a.source) ? 1 : 0;
+      const eb = empty(b.source) ? 1 : 0;
+      if (ea !== eb) return ea - eb;
+
       const qa = probes()[a.source]?.quality ?? 0;
       const qb = probes()[b.source]?.quality ?? 0;
       if (qa !== qb) return qb - qa;
@@ -197,14 +206,31 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     }
   };
 
+  const barren = () =>
+    detailRes.state === "ready" && (detailRes()?.episodes.length ?? 0) === 0;
+
   createEffect(() => {
-    if (probing() || pinned() || !chosen()) return;
+    if (probing() || !chosen()) return;
     if (Object.keys(probes()).length === 0) return;
 
-    const current = probes()[chosen()!];
+    const key = chosen()!;
+    const current = probes()[key];
     const best = available()[0];
-    if (!best || best.source === chosen()) return;
-    if ((probes()[best.source]?.quality ?? 0) <= (current?.quality ?? 0)) return;
+    if (!best || best.source === key) return;
+
+    const hollow = barren() || empty(key);
+    if (!hollow && pinned()) return;
+    if (!hollow && (probes()[best.source]?.quality ?? 0) <= (current?.quality ?? 0)) {
+      return;
+    }
+    if (empty(best.source)) return;
+
+    if (hollow) {
+      pushToast(
+        `У «${sourceName(key)}» нет серий — включил «${sourceName(best.source)}»`,
+        "info",
+      );
+    }
 
     setChosen(best.source);
     void api

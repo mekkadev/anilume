@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { SOURCE_CARD, TITLES, installTauri, watchForCrashes } from "./harness";
+import {
+  ANIME_DETAIL,
+  SOURCE_CARD,
+  TITLES,
+  installTauri,
+  watchForCrashes,
+} from "./harness";
 
 const crashes: string[] = [];
 
@@ -137,6 +143,32 @@ test("источник без плееров не роняет страницу 
     timeout: 8000,
   });
   await expect(page.locator(".episode")).toHaveCount(12);
+});
+
+test("источник без серий уступает тому, у кого они есть", async ({ page }) => {
+  await installTauri(page, {
+    overrides: {
+      anime_get: { ...ANIME_DETAIL, episodes: [] },
+      catalog_search_multi: {
+        query: "",
+        groups: [
+          { source: "animego", items: [{ ...SOURCE_CARD, source: "animego", handle: "s-go" }] },
+        ],
+        failures: [],
+      },
+      catalog_probe: {
+        probes: [
+          { source: "anilibria", handle: "search-0", quality: null, dubs: 0, episodes: 0, error: null },
+          { source: "animego", handle: "s-go", quality: 1080, dubs: 3, episodes: 12, error: null },
+        ],
+      },
+    },
+  });
+  await page.goto("/");
+  await page.locator(".card").first().click();
+
+  await expect(page.locator(".toast")).toContainText("нет серий", { timeout: 10000 });
+  await expect(page.locator(".toast")).toContainText("включил", { timeout: 10000 });
 });
 
 test("осечка источника переключает на следующий сама", async ({ page }) => {

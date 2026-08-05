@@ -69,6 +69,17 @@ const SOURCE_KEYS = [
   "hdrezka",
 ];
 
+export const ANIME_DETAIL = {
+  handle: "anime-1",
+  source: "anilibria",
+  key: "https://site/a/0",
+  title: TITLES[0],
+  poster: poster("card-0"),
+  description: "Описание из источника.",
+  meta: meta(),
+  episodes,
+};
+
 export const FIXTURES: Record<string, unknown> = {
   sources_list: {
     default: "anilibria",
@@ -86,16 +97,7 @@ export const FIXTURES: Record<string, unknown> = {
   catalog_search: { items: cards, query: "" },
   catalog_search_multi: { query: "", groups: [{ source: "anilibria", items: cards }], failures: [] },
   catalog_probe: { probes: [] },
-  anime_get: {
-    handle: "anime-1",
-    source: "anilibria",
-    key: "https://site/a/0",
-    title: TITLES[0],
-    poster: poster("card-0"),
-    description: "Описание из источника.",
-    meta: meta(),
-    episodes,
-  },
+  anime_get: ANIME_DETAIL,
   episode_studios: {
     studios: [
       { handle: "source-1", title: "AniLibria", player: "kodik.info", url: "https://k/1" },

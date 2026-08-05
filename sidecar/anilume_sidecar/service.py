@@ -78,7 +78,20 @@ class AnilumeService:
         return {"section": section, "keys": sorted(merged)}
 
     async def sources_list(self, _: dict[str, Any]) -> dict[str, Any]:
-        return {"sources": [s.to_json() for s in SOURCES], "default": DEFAULT_SOURCE}
+        gated = not settings.get("animelib", "token")
+        listed = []
+        for source in SOURCES:
+            entry = source.to_json()
+            if source.key == "animelib" and gated:
+                entry["priority"] = 45
+                entry["notes"] = [
+                    "Без токена отдаёт только Kodik — 720p",
+                    *entry["notes"],
+                ]
+            listed.append(entry)
+
+        fallback = "yummy_anime" if gated else DEFAULT_SOURCE
+        return {"sources": listed, "default": fallback}
 
     async def animelib_servers(self, _: dict[str, Any]) -> dict[str, Any]:
         extractor = self.pool.get("animelib")

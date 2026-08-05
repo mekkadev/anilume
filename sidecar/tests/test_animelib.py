@@ -138,3 +138,30 @@ def test_meta_survives_a_changed_payload_shape():
     assert meta["genres"] == []
     assert meta["tags"] == []
     assert meta["episodesTotal"] is None
+
+
+def test_relevance_puts_the_real_title_above_recaps():
+    from anilume_sidecar.animelib import relevance
+
+    cards = [
+        {"rus_name": "Магическая битва: Рекапы", "rating": {"votes": 10}, "shiki_rate": 5.0},
+        {"rus_name": "Магическая битва 2", "rating": {"votes": 7000}, "shiki_rate": 8.6},
+        {"rus_name": "Магическая битва", "rating": {"votes": 9000}, "shiki_rate": 8.52},
+        {"rus_name": "Атака титанов: Обзор за двадцать минут", "rating": {"votes": 50}},
+    ]
+
+    ordered = [c["rus_name"] for c in sorted(cards, key=lambda c: relevance(c, "Магическая битва"))]
+
+    assert ordered[0] == "Магическая битва"
+    assert ordered[1] == "Магическая битва 2"
+    assert "Рекапы" in ordered[2]
+    assert "Обзор" in ordered[3]
+
+
+def test_relevance_prefers_more_votes_among_equal_matches():
+    from anilume_sidecar.animelib import relevance
+
+    quiet = {"rus_name": "Тайтл", "rating": {"votes": 3}}
+    loud = {"rus_name": "Тайтл", "rating": {"votes": 900}}
+
+    assert relevance(loud, "Тайтл") < relevance(quiet, "Тайтл")
