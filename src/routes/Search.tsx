@@ -15,7 +15,7 @@ import { ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
 import { ensureArt } from "../lib/art";
 import { normalise } from "../lib/match";
-import { pending, settled } from "../lib/resource";
+import { broke, pending } from "../lib/resource";
 import { navigate, sources } from "../lib/store";
 import type { AnimeCard, DiscoverCard } from "../lib/types";
 
@@ -81,7 +81,9 @@ export function Search(props: { query: string }) {
     },
   );
 
-  const results = () => settled(resultsRes);
+  const results = () =>
+    resultsRes.state === "errored" ? undefined : resultsRes.latest;
+  const busy = () => pending(resultsRes);
 
   createEffect(() => {
     const ids = (results()?.shiki ?? []).map((card) => card.id);
@@ -140,26 +142,46 @@ export function Search(props: { query: string }) {
         <span class="kbd">⌘K</span>
       </form>
 
-      <Show when={needle().length > 0} fallback={<div class="empty" />}>
+      <Show
+        when={needle().length > 0}
+        fallback={
+          <div class="empty">
+            <div class="empty__title">Начните вводить название</div>
+            <p>Работают русское, английское и ромадзи — минимум две буквы</p>
+          </div>
+        }
+      >
         <Show
-          when={!pending(resultsRes)}
+          when={results()}
           fallback={
-            <div class="poster-grid">
-              <Index each={Array(10).fill(0)}>{() => <PosterSkeleton />}</Index>
-            </div>
+            <Show
+              when={!broke(resultsRes)}
+              fallback={
+                <div class="empty">
+                  <div class="empty__title">Поиск не ответил</div>
+                  <p>Проверьте сеть и попробуйте ещё раз</p>
+                </div>
+              }
+            >
+              <div class="poster-grid">
+                <Index each={Array(10).fill(0)}>{() => <PosterSkeleton />}</Index>
+              </div>
+            </Show>
           }
         >
           <Show
             when={total() > 0}
             fallback={
-              <div class="empty">
-                <div class="empty__title">Ничего не найдено</div>
-                <p>Попробуйте оригинальное или английское название</p>
-              </div>
+              <Show when={!busy()}>
+                <div class="empty">
+                  <div class="empty__title">Ничего не найдено</div>
+                  <p>Попробуйте оригинальное или английское название</p>
+                </div>
+              </Show>
             }
           >
             <Show when={(results()?.shiki ?? []).length > 0}>
-              <div class="poster-grid">
+              <div class="poster-grid" data-busy={busy()}>
                 <For each={results()?.shiki}>
                   {(card) => <ShikiCard card={card} onOpen={openShiki} />}
                 </For>

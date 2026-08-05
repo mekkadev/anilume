@@ -315,6 +315,29 @@ test("одноимённые тайтлы разных лет не путают�
   await expect(page.locator(".fact__value", { hasText: "1999" })).toHaveCount(0);
 });
 
+test("«назад» возвращает на прежнее место скролла", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+  await page.locator(".card").first().waitFor();
+
+  const scroller = page.locator(".stage__scroll");
+  await scroller.evaluate((node) => node.scrollTo({ top: 600 }));
+
+  await page.keyboard.press("/");
+  await page.locator(".palette__field input").fill("дороро");
+  await page.locator(".palette__hit").first().waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".title-info__name").waitFor({ timeout: 8000 });
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Популярное" })).toBeVisible({
+    timeout: 8000,
+  });
+  await expect
+    .poll(() => scroller.evaluate((node) => node.scrollTop), { timeout: 5000 })
+    .toBeGreaterThan(400);
+});
+
 test("осечка источника переключает на следующий сама", async ({ page }) => {
   await installTauri(page, {
     failWhen: { episode_studios: "search-0:" },

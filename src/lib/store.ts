@@ -29,7 +29,23 @@ const [ahead, setAhead] = createSignal<Route[]>([]);
 
 export { route };
 
+let readScroll: (() => number) | null = null;
+const scrollSpots = new WeakMap<Route, number>();
+
+export function bindScrollKeeper(reader: () => number) {
+  readScroll = reader;
+}
+
+export function scrollSpotOf(target: Route) {
+  return scrollSpots.get(target) ?? 0;
+}
+
+function stashScroll() {
+  if (readScroll) scrollSpots.set(route(), readScroll());
+}
+
 export function navigate(next: Route) {
+  stashScroll();
   setStack([...stack(), route()].slice(-50));
   setAhead([]);
   setRoute(next);
@@ -39,6 +55,7 @@ export function goBack() {
   const current = stack();
   const previous = current[current.length - 1];
   if (!previous) return;
+  stashScroll();
   setStack(current.slice(0, -1));
   setAhead([route(), ...ahead()].slice(0, 50));
   setRoute(previous);
@@ -47,6 +64,7 @@ export function goBack() {
 export function goForward() {
   const [next, ...rest] = ahead();
   if (!next) return;
+  stashScroll();
   setStack([...stack(), route()].slice(-50));
   setAhead(rest);
   setRoute(next);

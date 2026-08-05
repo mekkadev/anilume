@@ -44,6 +44,7 @@ export function Player(props: { request: PlaybackRequest }) {
   let hls: HlsPlayer | null = null;
   let hideTimer: number | undefined;
   let saveTimer: number | undefined;
+  let clickTimer: number | undefined;
   let subtitleInput!: HTMLInputElement;
 
   const [episodeIndex, setEpisodeIndex] = createSignal(props.request.episodeIndex);
@@ -560,6 +561,7 @@ export function Player(props: { request: PlaybackRequest }) {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       window.clearTimeout(hideTimer);
+      window.clearTimeout(clickTimer);
       window.clearInterval(saveTimer);
       for (const track of externalSubs()) URL.revokeObjectURL(track.url);
       hls?.destroy();
@@ -613,7 +615,11 @@ export function Player(props: { request: PlaybackRequest }) {
         ref={video}
         class="player__video"
         playsinline
-        onClick={togglePlay}
+        onClick={() => {
+          window.clearTimeout(clickTimer);
+          clickTimer = window.setTimeout(togglePlay, 220);
+        }}
+        onDblClick={() => window.clearTimeout(clickTimer)}
         onPlay={() => {
           setPlaying(true);
           revealControls();

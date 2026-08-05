@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "anilume"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anilume-core",
  "reqwest 0.12.28",

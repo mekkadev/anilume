@@ -27,6 +27,7 @@ import { loadPrefs, restoreSourceConfig } from "./lib/prefs";
 import { api, checkForUpdate } from "./lib/api";
 import {
   ambient,
+  bindScrollKeeper,
   canGoBack,
   canGoForward,
   goBack,
@@ -41,6 +42,7 @@ import {
   pushToast,
   reportError,
   route,
+  scrollSpotOf,
 } from "./lib/store";
 
 export function App() {
@@ -128,9 +130,25 @@ export function App() {
 
   let scroller!: HTMLDivElement;
 
+  onMount(() => bindScrollKeeper(() => scroller?.scrollTop ?? 0));
+
   createEffect(() => {
-    route();
-    scroller?.scrollTo({ top: 0 });
+    const current = route();
+    const spot = scrollSpotOf(current);
+
+    if (spot <= 0) {
+      queueMicrotask(() => scroller?.scrollTo({ top: 0 }));
+      return;
+    }
+
+    let tries = 0;
+    const attempt = () => {
+      if (route() !== current || !scroller) return;
+      scroller.scrollTo({ top: spot });
+      if (scroller.scrollTop + 4 >= spot || tries++ > 40) return;
+      requestAnimationFrame(attempt);
+    };
+    queueMicrotask(attempt);
   });
 
   createEffect(() => {

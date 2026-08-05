@@ -318,6 +318,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
   gap: 20px 16px;
+  transition: opacity var(--fast) var(--ease-out);
+}
+
+.poster-grid[data-busy="true"] {
+  opacity: 0.55;
 }
 
 .card {

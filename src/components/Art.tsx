@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 
 import { Icon } from "./Icon";
 
@@ -9,18 +9,43 @@ interface ArtProps {
 }
 
 export function Art(props: ArtProps) {
+  const [shown, setShown] = createSignal<string | null>(null);
   const [loaded, setLoaded] = createSignal(false);
   const [broken, setBroken] = createSignal(false);
 
-  let last: string | null = null;
-  let virgin = true;
+  let probe: HTMLImageElement | null = null;
 
   createEffect(() => {
     const value = props.src ?? null;
-    if (!virgin && value === last) return;
-    virgin = false;
-    last = value;
-    setBroken(false);
+    if (value === shown()) return;
+
+    probe?.removeAttribute("src");
+    probe = null;
+
+    if (!value || !loaded()) {
+      setShown(value);
+      setBroken(false);
+      return;
+    }
+
+    const loader = new Image();
+    probe = loader;
+    loader.onload = () => {
+      if (probe !== loader) return;
+      probe = null;
+      setBroken(false);
+      setShown(value);
+    };
+    loader.onerror = () => {
+      if (probe !== loader) return;
+      probe = null;
+    };
+    loader.src = value;
+  });
+
+  onCleanup(() => {
+    probe?.removeAttribute("src");
+    probe = null;
   });
 
   const initials = () =>
@@ -33,14 +58,14 @@ export function Art(props: ArtProps) {
       .join("");
 
   return (
-    <Show when={props.src && !broken()} fallback={<Blank label={initials()} />}>
+    <Show when={shown() && !broken()} fallback={<Blank label={initials()} />}>
       <img
         ref={(node) =>
           queueMicrotask(() => {
             if (node.complete && node.naturalWidth > 0) setLoaded(true);
           })
         }
-        src={props.src!}
+        src={shown()!}
         alt=""
         loading={props.eager ? "eager" : "lazy"}
         decoding="async"

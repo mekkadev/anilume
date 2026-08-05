@@ -446,7 +446,7 @@ export function Discover() {
       </Show>
 
       <Show
-        when={!loading()}
+        when={!(loading() && items().length === 0)}
         fallback={
           <div class="poster-grid">
             <Index each={Array(12).fill(0)}>{() => <PosterSkeleton />}</Index>
@@ -456,18 +456,20 @@ export function Discover() {
         <Show
           when={items().length > 0}
           fallback={
-            <div class="empty">
-              <div class="empty__title">Под эти фильтры ничего нет</div>
-              <p>Снимите часть условий или расширьте диапазон лет</p>
-              <Show when={touched()}>
-                <button class="btn btn--primary" onClick={reset}>
-                  Сбросить фильтры
-                </button>
-              </Show>
-            </div>
+            <Show when={!loading()}>
+              <div class="empty">
+                <div class="empty__title">Под эти фильтры ничего нет</div>
+                <p>Снимите часть условий или расширьте диапазон лет</p>
+                <Show when={touched()}>
+                  <button class="btn btn--primary" onClick={reset}>
+                    Сбросить фильтры
+                  </button>
+                </Show>
+              </div>
+            </Show>
           }
         >
-          <div class="poster-grid">
+          <div class="poster-grid" data-busy={loading()}>
             <For each={items()}>
               {(card) => (
                 <ShikiCard card={card} onOpen={open} />
