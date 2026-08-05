@@ -108,6 +108,65 @@ pub async fn studio_videos(state: State<'_, AppState>, handle: String) -> Answer
         .await?)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkipInterval {
+    pub kind: String,
+    pub start: f64,
+    pub end: f64,
+}
+
+#[tauri::command]
+pub async fn skip_times(
+    mal_id: i64,
+    episode: i64,
+    length: f64,
+) -> Answer<Vec<SkipInterval>> {
+    let url = format!(
+        "https://api.aniskip.com/v2/skip-times/{mal_id}/{episode}\
+         ?types%5B%5D=op&types%5B%5D=ed&episodeLength={length:.0}"
+    );
+
+    let response = reqwest::Client::new()
+        .get(url.replace(char::is_whitespace, ""))
+        .header(reqwest::header::USER_AGENT, "anilume")
+        .timeout(std::time::Duration::from_secs(12))
+        .send()
+        .await
+        .map_err(|e| anilume_core::CoreError::Network(e.to_string()))?;
+
+    if !response.status().is_success() {
+        return Ok(Vec::new());
+    }
+
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|e| anilume_core::CoreError::Network(e.to_string()))?;
+
+    let mut found = Vec::new();
+    for entry in body.get("results").and_then(Value::as_array).unwrap_or(&vec![]) {
+        let interval = match entry.get("interval") {
+            Some(value) => value,
+            None => continue,
+        };
+        let start = interval.get("startTime").and_then(Value::as_f64);
+        let end = interval.get("endTime").and_then(Value::as_f64);
+        let kind = entry.get("skipType").and_then(Value::as_str);
+
+        if let (Some(start), Some(end), Some(kind)) = (start, end, kind) {
+            if end > start {
+                found.push(SkipInterval {
+                    kind: kind.to_owned(),
+                    start,
+                    end,
+                });
+            }
+        }
+    }
+    Ok(found)
+}
+
 #[tauri::command]
 pub async fn playback_open(
     state: State<'_, AppState>,

@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Права основного окна приложения",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -15,6 +17,9 @@
     "opener:allow-open-url",
     "opener:allow-reveal-item-in-dir",
     "os:allow-platform",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "core:asset:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

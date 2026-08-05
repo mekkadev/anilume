@@ -7,7 +7,11 @@ export function Toasts() {
     <div class="toasts">
       <For each={toasts}>
         {(toast) => (
-          <div class="toast" data-tone={toast.tone} onClick={() => dismissToast(toast.id)}>
+          <div class="toast" data-tone={toast.tone} onClick={() => {
+              toast.action?.();
+              dismissToast(toast.id);
+            }}
+            data-clickable={Boolean(toast.action)}>
             <div>{toast.message}</div>
             <Show when={toast.hint}>
               <div class="toast__hint">{toast.hint}</div>

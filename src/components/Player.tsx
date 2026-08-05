@@ -56,6 +56,30 @@ export function Player(props: { request: PlaybackRequest }) {
   const [subtitleTracks, setSubtitleTracks] = createSignal<{ name: string; lang?: string }[]>([]);
   const [subtitleTrack, setSubtitleTrack] = createSignal(-1);
   const [switchingTo, setSwitchingTo] = createSignal<number | null>(null);
+  const [skips, setSkips] = createSignal<{ kind: string; start: number; end: number }[]>([]);
+
+  const activeSkip = () =>
+    skips().find((item) => current() >= item.start && current() < item.end - 1);
+
+  async function loadSkipTimes() {
+    setSkips([]);
+    const malId = props.request.malId;
+    const ordinal = episode()?.ordinal;
+    if (!malId || !ordinal || duration() <= 0) return;
+
+    try {
+      setSkips(await api.skipTimes(malId, ordinal, duration()));
+    } catch {
+      setSkips([]);
+    }
+  }
+
+  function skipCurrent() {
+    const target = activeSkip();
+    if (!target) return;
+    video.currentTime = Math.min(target.end, duration() - 0.2);
+    revealControls();
+  }
 
   const episode = () => props.request.episodes[episodeIndex()];
   const activeVideo = () => videos()[qualityIndex()];
@@ -71,8 +95,11 @@ export function Player(props: { request: PlaybackRequest }) {
     hls = null;
 
     try {
-      const { url } = await api.openPlayback(target.url, target.headers);
-      const isHls = target.type === "m3u8" || url.includes(".m3u8");
+      const local = props.request.offline || !/^https?:/i.test(target.url);
+      const url = local
+        ? target.url
+        : (await api.openPlayback(target.url, target.headers)).url;
+      const isHls = !local && (target.type === "m3u8" || url.includes(".m3u8"));
 
       const applySeek = () => {
         if (seekTo > 0) video.currentTime = seekTo;
@@ -377,7 +404,10 @@ export function Player(props: { request: PlaybackRequest }) {
         onWaiting={() => setBuffering(true)}
         onPlaying={() => setBuffering(false)}
         onCanPlay={() => setBuffering(false)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
+        onLoadedMetadata={(event) => {
+          setDuration(event.currentTarget.duration || 0);
+          void loadSkipTimes();
+        }}
         onTimeUpdate={(event) => {
           const element = event.currentTarget;
           setCurrent(element.currentTime);
@@ -403,6 +433,15 @@ export function Player(props: { request: PlaybackRequest }) {
         </div>
       </Show>
 
+      <Show when={activeSkip()}>
+        {(skip) => (
+          <button class="skip-button" onClick={skipCurrent}>
+            {skip().kind === "ed" ? "Пропустить эндинг" : "Пропустить опенинг"}
+            <Icon name="next" size={14} />
+          </button>
+        )}
+      </Show>
+
       <div class="player__top">
         <button class="player-btn" onClick={exit} title="Закрыть (Esc)">
           <Icon name="close" size={20} />
@@ -412,6 +451,7 @@ export function Player(props: { request: PlaybackRequest }) {
           <div class="player__subtitle">
             {episode()?.title}
             <Show when={studioTitle()}> · {studioTitle()}</Show>
+            <Show when={props.request.offline}> · офлайн</Show>
           </div>
         </div>
       </div>

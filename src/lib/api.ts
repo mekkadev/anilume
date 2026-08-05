@@ -85,6 +85,13 @@ export const api = {
 
   closePlayback: () => call<void>("playback_close"),
 
+  skipTimes: (malId: number, episode: number, length: number) =>
+    call<{ kind: string; start: number; end: number }[]>("skip_times", {
+      malId,
+      episode,
+      length,
+    }),
+
   saveProgress: (progress: WatchProgress) =>
     call<void>("progress_save", { progress }),
 
@@ -167,5 +174,27 @@ export const api = {
   onDownloadProgress: (handler: (event: DownloadEvent) => void) =>
     listen<DownloadEvent>(DOWNLOAD_EVENT, (event) => handler(event.payload)),
 };
+
+export async function checkForUpdate(): Promise<
+  { version: string; notes: string; install: () => Promise<void> } | null
+> {
+  try {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (!update) return null;
+
+    return {
+      version: update.version,
+      notes: update.body ?? "",
+      install: async () => {
+        await update.downloadAndInstall();
+        const { relaunch } = await import("@tauri-apps/plugin-process");
+        await relaunch();
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 
 export type { EpisodeInfo };

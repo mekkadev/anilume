@@ -127,3 +127,27 @@ solid rather than react because the catalogue is a long scroll of images and fin
 built on [anicli-api](https://github.com/vypivshiy/anicli-api) by vypivshiy, which does the actual work of turning a title into a url.
 
 mit
+
+## updates
+
+the app checks for a new release on launch and offers to install it. that needs a
+signing keypair, which is not in the repository — generate your own once:
+
+```bash
+npx tauri signer generate -w ~/.tauri/anilume.key
+```
+
+put the **public** key into `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`,
+and add the private key and its password as repository secrets named
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+the release workflow checks for that secret. without it the build still succeeds,
+it just ships without update artifacts — so a missing key degrades the release
+rather than breaking it.
+
+## skipping the opening
+
+episode intervals come from [aniskip](https://api.aniskip.com), keyed by myanimelist
+id. shikimori shares those ids for anime, so any source that hands over a shikimori
+id gets the skip button — yummy anime directly, animelib through its shikimori link.
+when aniskip has nothing for an episode the button simply never appears.

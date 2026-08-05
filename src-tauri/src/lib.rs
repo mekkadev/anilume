@@ -19,6 +19,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -58,6 +60,7 @@ pub fn run() {
             commands::animelib_servers,
             commands::episode_studios,
             commands::studio_videos,
+            commands::skip_times,
             commands::playback_open,
             commands::playback_close,
             commands::progress_save,

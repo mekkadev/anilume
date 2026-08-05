@@ -621,3 +621,12 @@
     transform: translateY(4px);
   }
 }
+
+.toast[data-clickable="true"] {
+  cursor: default;
+  box-shadow: var(--shadow-popover), inset 0 0 0 1px var(--accent);
+}
+
+.toast[data-clickable="true"]:hover {
+  background: var(--fill);
+}
