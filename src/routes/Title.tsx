@@ -15,7 +15,7 @@ import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt, posterFor } from "../lib/art";
-import { normalise, pickMatch } from "../lib/match";
+import { normalise, pickMatch, score } from "../lib/match";
 import { broke, pending, settled } from "../lib/resource";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
 import {
@@ -106,6 +106,7 @@ interface WatchOption {
 }
 
 const EXTRA_SOURCES = 4;
+const SCORE_SLACK = 40;
 
 function pickBest(items: AnimeCard[], aliases: string[], year?: number | null) {
   return pickMatch(
@@ -193,12 +194,22 @@ export function Title(props: {
     return Boolean(probe) && probe!.episodes === 0;
   };
 
+  const scoreOf = (card: AnimeCard) =>
+    score(card.title, names(), wantYear(), card.meta.year);
+
+  const kin = (card: AnimeCard, anchor: AnimeCard | null) =>
+    !anchor || scoreOf(card) >= scoreOf(anchor) - SCORE_SLACK;
+
   const available = () => {
     const order = new Map(sources().map((item) => [item.key, item.priority ?? 50]));
     return Object.values(candidates()).sort((a, b) => {
       const ea = empty(a.source) ? 1 : 0;
       const eb = empty(b.source) ? 1 : 0;
       if (ea !== eb) return ea - eb;
+
+      const sa = scoreOf(a);
+      const sb = scoreOf(b);
+      if (sa !== sb) return sb - sa;
 
       const qa = probes()[a.source]?.quality ?? 0;
       const qb = probes()[b.source]?.quality ?? 0;
@@ -267,6 +278,7 @@ export function Title(props: {
     if (!hollow && (probes()[best.source]?.quality ?? 0) <= (current?.quality ?? 0)) {
       return;
     }
+    if (!hollow && !kin(best, candidates()[key] ?? null)) return;
     if (empty(best.source)) return;
 
     if (hollow) {
@@ -477,8 +489,12 @@ export function Title(props: {
     setCollecting(true);
     try {
       const anchor = nextEpisode()?.ordinal ?? 1;
+      const mine = active();
       const rest = available()
-        .filter((card) => card.source !== chosen() && !empty(card.source))
+        .filter(
+          (card) =>
+            card.source !== chosen() && !empty(card.source) && kin(card, mine),
+        )
         .sort(
           (a, b) =>
             (probes()[b.source]?.quality ?? 0) - (probes()[a.source]?.quality ?? 0),
@@ -542,7 +558,7 @@ export function Title(props: {
     const add = (card: AnimeCard | null | undefined, list: StudioInfo[] | undefined) => {
       if (!card || !list) return;
       for (const studio of list) {
-        const key = normalise(studio.title) || studio.title;
+        const key = normalise(studio.title).replace(/ /g, "") || studio.title;
         const quality = dubQuality()[studio.handle] ?? null;
         const prev = seen.get(key);
         if (!prev || (quality ?? 0) > (prev.quality ?? 0)) {
@@ -551,12 +567,15 @@ export function Title(props: {
       }
     };
 
-    add(active(), studios());
+    const mine = active();
+    add(mine, studios());
     const current = chosen();
     const table = { ...extraStudios(), ...studioCache() };
     for (const [key, list] of Object.entries(table)) {
       if (key === current) continue;
-      add(candidates()[key], list);
+      const card = candidates()[key];
+      if (!card || !kin(card, mine)) continue;
+      add(card, list);
     }
 
     return [...seen.values()].sort(
@@ -684,7 +703,9 @@ export function Title(props: {
           await scanOthers();
         }
 
-        const queue = available().filter((item) => item.source !== current?.source);
+        const queue = available().filter(
+          (item) => item.source !== current?.source && kin(item, current ?? null),
+        );
         for (const candidate of found ? [] : queue) {
           found = await resolveFrom(candidate, episode.ordinal).catch(() => null);
           if (found) break;
@@ -1134,6 +1155,17 @@ export function Title(props: {
                         </button>
                       )}
                     </For>
+                    <Show when={scanning() || probing() || collecting() || weighing()}>
+                      <div class="dub dub--ghost">
+                        <span class="spinner" />
+                        <Show
+                          when={(bestDub() ?? 0) > 720}
+                          fallback="ищем варианты получше — 1080p может подъехать"
+                        >
+                          ищем ещё варианты
+                        </Show>
+                      </div>
+                    </Show>
                   </div>
                 </Show>
               </Show>

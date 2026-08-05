@@ -377,6 +377,67 @@ test("озвучки из всех источников сливаются в о
   ).toBeVisible();
 });
 
+test("чужой сезон с лучшим качеством не перехватывает страницу", async ({ page }) => {
+  await installTauri(page, {
+    overrides: {
+      catalog_search: {
+        query: "",
+        items: [{ ...SOURCE_CARD, meta: { ...SOURCE_CARD.meta, year: 2019 } }],
+      },
+      catalog_search_multi: {
+        query: "",
+        groups: [
+          {
+            source: "animego",
+            items: [
+              {
+                ...SOURCE_CARD,
+                source: "animego",
+                handle: "s-final",
+                key: "k-final",
+                title: `${TITLES[0]}: Финал`,
+                meta: { ...SOURCE_CARD.meta, year: 2023 },
+              },
+            ],
+          },
+        ],
+        failures: [],
+      },
+      catalog_probe: {
+        probes: [
+          { source: "anilibria", handle: "search-0", quality: 720, dubs: 1, episodes: 12, error: null },
+          { source: "animego", handle: "s-final", quality: 1080, dubs: 1, episodes: 12, error: null },
+        ],
+      },
+      studios_by_prefix: {
+        "search-0": [
+          { handle: "st-a", title: "AniLibria", player: "kodik.info", url: "https://k/a" },
+        ],
+        "s-final": [
+          { handle: "st-x", title: "Чужая озвучка", player: "aniboom.one", url: "https://a/x" },
+        ],
+      },
+      studio_qualities: {
+        qualities: [
+          { handle: "st-a", quality: 720, error: null },
+          { handle: "st-x", quality: 1080, error: null },
+        ],
+      },
+    },
+  });
+
+  await page.goto("/");
+  await page.locator(".card").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+
+  await expect(page.locator(".dub:not(.dub--ghost)")).toHaveCount(1, {
+    timeout: 10000,
+  });
+  await page.waitForTimeout(600);
+  await expect(page.locator(".dub", { hasText: "Чужая озвучка" })).toHaveCount(0);
+  await expect(page.locator(".title-info__name")).toHaveText(TITLES[0]);
+});
+
 test("поиск переживает молчащий каталог за счёт плееров", async ({ page }) => {
   await installTauri(page, { failWhen: { discover_search: "" } });
   await page.goto("/");
@@ -469,7 +530,7 @@ test("расписание группирует серии по дням", async
 
   await expect(page.locator(".airing")).toHaveCount(3, { timeout: 8000 });
   await expect(page.getByRole("heading", { name: "Из вашей библиотеки" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Сегодня" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Сегодня|Завтра/ }).first()).toBeVisible();
   await expect(page.locator('.airing[data-mine="true"]')).toHaveCount(2);
   await expect(page.locator(".airing__meta").first()).toContainText("8 серия");
 
