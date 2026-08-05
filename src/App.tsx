@@ -10,6 +10,7 @@ import {
 } from "solid-js";
 
 import { Icon } from "./components/Icon";
+import { Palette } from "./components/Palette";
 import { Player } from "./components/Player";
 import { Rail } from "./components/Rail";
 import { Toasts } from "./components/Toasts";
@@ -28,8 +29,11 @@ import {
   canGoBack,
   goBack,
   loadSources,
+  closePalette,
   matchRoute,
   navigate,
+  openPalette,
+  paletteOpen,
   playback,
   pushToast,
   reportError,
@@ -71,13 +75,16 @@ export function App() {
 
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
-        navigate({ name: "search", query: "" });
+        if (paletteOpen()) closePalette();
+        else openPalette();
         return;
       }
 
+      if (paletteOpen()) return;
+
       if (event.key === "/" && !typing) {
         event.preventDefault();
-        navigate({ name: "search", query: "" });
+        openPalette();
         return;
       }
 
@@ -184,6 +191,10 @@ export function App() {
           </div>
         </div>
       </div>
+
+      <Show when={paletteOpen()}>
+        <Palette />
+      </Show>
 
       <Show when={playback()}>
         <Player request={playback()!} />

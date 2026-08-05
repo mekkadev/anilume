@@ -44,6 +44,18 @@ export function matchRoute<K extends RouteName>(
   return current.name === name ? (current as Extract<Route, { name: K }>) : false;
 }
 
+const [paletteOpen, setPaletteOpen] = createSignal(false);
+
+export { paletteOpen };
+
+export function openPalette() {
+  setPaletteOpen(true);
+}
+
+export function closePalette() {
+  setPaletteOpen(false);
+}
+
 const [sources, setSources] = createSignal<SourceInfo[]>([]);
 const [activeSource, setActiveSourceSignal] = createSignal<string>("anilibria");
 

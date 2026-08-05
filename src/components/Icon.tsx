@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Clock,
+  CornerDownLeft,
   Download,
   ExternalLink,
   Flame,
@@ -39,6 +40,7 @@ import {
 const ICONS = {
   home: House,
   search: Search,
+  enter: CornerDownLeft,
   library: Library,
   download: Download,
   settings: Settings,

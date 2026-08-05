@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import {
   activeSource,
   navigate,
+  openPalette,
   route,
   setActiveSource,
   sourceName,
@@ -78,10 +79,10 @@ export function Rail() {
         <button
           class="rail-btn"
           data-active={route().name === "search"}
-          onClick={() => navigate({ name: "search", query: "" })}
+          onClick={openPalette}
         >
           <Icon name="search" size={20} />
-          <span class="rail-btn__tip">Поиск</span>
+          <span class="rail-btn__tip">Поиск · ⌘K</span>
         </button>
 
         <button

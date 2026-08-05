@@ -98,17 +98,60 @@ test("серия открывает плеер", async ({ page }) => {
   await expect(page.locator(".player")).toHaveCount(0);
 });
 
-test("поиск находит тайтл и открывает его", async ({ page }) => {
+test("палитра ищет по мере ввода и открывает стрелками", async ({ page }) => {
   await installTauri(page);
   await page.goto("/");
 
   await page.keyboard.press("/");
-  await page.locator("input[type='search'], .search-field input, input").first().fill("дороро");
-  await page.keyboard.press("Enter");
+  await expect(page.locator(".palette__panel")).toBeVisible();
 
-  await expect(page.locator(".card").first()).toBeVisible({ timeout: 8000 });
-  await page.locator(".card").first().click();
+  await page.locator(".palette__field input").fill("дороро");
+  await expect(page.locator(".palette__hit")).toHaveCount(4, { timeout: 8000 });
+  await expect(page.locator('.palette__hit[data-active="true"] .palette__name')).toHaveText(
+    TITLES[0],
+  );
+
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator('.palette__hit[data-active="true"] .palette__name')).toHaveText(
+    TITLES[2],
+  );
+
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".palette__panel")).toHaveCount(0);
   await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+});
+
+test("палитра закрывается по Esc и уводит в полный поиск", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+
+  await page.keyboard.press("Meta+k");
+  await expect(page.locator(".palette__panel")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".palette__panel")).toHaveCount(0);
+
+  await page.keyboard.press("Meta+k");
+  await page.locator(".palette__field input").fill("дороро");
+  await expect(page.locator(".palette__hit").first()).toBeVisible({ timeout: 8000 });
+  await page.locator(".palette__foot").click();
+
+  await expect(page.getByRole("heading", { name: "Поиск" })).toBeVisible();
+  await expect(page.locator(".card").first()).toBeVisible({ timeout: 8000 });
+});
+
+test("страница поиска ищет без нажатия Enter", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Настройки" }).click();
+  await page.keyboard.press("Meta+k");
+  await page.locator(".palette__field input").fill("дороро");
+  await page.locator(".palette__foot").click();
+
+  await page.locator(".search-field input").fill("клинок");
+  await expect(page.locator(".page-sub")).toContainText("«клинок»", { timeout: 8000 });
+  await expect(page.locator(".card").first()).toBeVisible();
 });
 
 test("все разделы рельса открываются", async ({ page }) => {

@@ -1,4 +1,13 @@
-import { For, Index, Show, createResource, createSignal, onMount } from "solid-js";
+import {
+  For,
+  Index,
+  Show,
+  createEffect,
+  createResource,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
@@ -6,21 +15,35 @@ import { api } from "../lib/api";
 import { activeSource, navigate, sourceName, sources } from "../lib/store";
 import type { AnimeCard } from "../lib/types";
 
+const DEBOUNCE = 300;
+
 export function Search(props: { query: string }) {
   const [everywhere, setEverywhere] = createSignal(false);
   const [draft, setDraft] = createSignal(props.query);
+  const [needle, setNeedle] = createSignal(props.query);
   let field: HTMLInputElement | undefined;
+  let timer: number | undefined;
 
   onMount(() => field?.focus());
 
+  createEffect(() => {
+    const value = draft();
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => setNeedle(value.trim()), DEBOUNCE);
+  });
+
+  onCleanup(() => window.clearTimeout(timer));
+
+  createEffect(() => setDraft(props.query));
+
   const submit = (event: Event) => {
     event.preventDefault();
-    const value = draft().trim();
-    if (value.length > 0) navigate({ name: "search", query: value });
+    window.clearTimeout(timer);
+    setNeedle(draft().trim());
   };
 
   const [results] = createResource(
-    () => [props.query, everywhere(), activeSource()] as const,
+    () => [needle(), everywhere(), activeSource()] as const,
     async ([query, all, source]) => {
       if (query.trim().length === 0) return { groups: [], failures: [] };
       if (!all) {
@@ -49,9 +72,9 @@ export function Search(props: { query: string }) {
         <div>
           <h1 class="page-title">Поиск</h1>
           <p class="page-sub">
-            <Show when={props.query.trim().length > 0} fallback="По названию, в выбранном источнике или во всех сразу">
+            <Show when={needle().length > 0} fallback="По названию, в выбранном источнике или во всех сразу">
               <Show when={!results.loading} fallback="Ищем…">
-                «{props.query}» — найдено: {total()}
+                «{needle()}» — найдено: {total()}
               </Show>
             </Show>
           </p>
@@ -81,7 +104,7 @@ export function Search(props: { query: string }) {
         <span class="kbd">⌘K</span>
       </form>
 
-      <Show when={props.query.trim().length > 0} fallback={<div class="empty" />}>
+      <Show when={needle().length > 0} fallback={<div class="empty" />}>
       <Show
         when={!results.loading}
         fallback={
