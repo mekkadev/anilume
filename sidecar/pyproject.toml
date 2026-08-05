@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anilume-sidecar"
-version = "0.3.0"
+version = "0.3.1"
 description = "JSON-RPC мост между anicli-api и десктоп-приложением anilume"
 requires-python = ">=3.10"
 dependencies = [

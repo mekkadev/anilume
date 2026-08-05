@@ -54,7 +54,7 @@ export function Rail() {
     <aside class="rail">
       <div class="rail__dock">
         <div class="rail__mark">
-          <Icon name="mark" size={26} />
+          <img src="/mark.png" alt="anilume" width="32" height="32" />
         </div>
 
         <For each={NAV}>

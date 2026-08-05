@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Готовит иконку приложения из исходного логотипа.
 
-    python3 scripts/make_icon.py --source assets/logo.png --generate
+    python3 scripts/make_icon.py --source assets/logo.png --keep --generate
 
 Логотип обрезается по непрозрачному содержимому, вписывается в квадрат
 с отступом и, если задан фон, маскируется скруглённым квадратом macOS.
@@ -75,8 +75,19 @@ def squircle_mask(size: int) -> Image.Image:
     return mask
 
 
-def build(source: Path, background: str | None) -> Image.Image:
-    logo = trim(drop_flat_background(Image.open(source).convert("RGBA")))
+def build(source: Path, background: str | None, keep: bool) -> Image.Image:
+    original = Image.open(source).convert("RGBA")
+
+    if keep:
+        side = max(original.size)
+        square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        square.alpha_composite(
+            original, ((side - original.width) // 2, (side - original.height) // 2)
+        )
+        square.putalpha(squircle_mask(side))
+        return square.resize((SIZE, SIZE), Image.LANCZOS)
+
+    logo = trim(drop_flat_background(original))
 
     canvas = SIZE * SUPERSAMPLE
     content = int(canvas * CONTENT_SCALE)
@@ -106,6 +117,11 @@ def main() -> int:
     parser.add_argument("--source", default="assets/logo.png")
     parser.add_argument("--background", default=None)
     parser.add_argument("--generate", action="store_true")
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="не срезать фон: логотип уже нарисован во всю плитку",
+    )
     args = parser.parse_args()
 
     source = (ROOT / args.source).resolve()
@@ -113,7 +129,7 @@ def main() -> int:
         print(f"Не найден исходник: {source}")
         return 1
 
-    icon = build(source, args.background)
+    icon = build(source, args.background, args.keep)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     icon.save(OUTPUT)
     print(f"{OUTPUT.relative_to(ROOT)} — {icon.width}×{icon.height}")

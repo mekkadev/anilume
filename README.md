@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./assets/logo.png" width="200" alt="anilume">
+
 # anilume
 
 десктопный клиент для просмотра аниме с русской озвучкой на macOS и Windows —
@@ -30,11 +32,11 @@ anilume идёт другим путём. [anicli-api](https://github.com/vypivs
 
 | файл | для чего |
 | --- | --- |
-| `anilume_0.3.0_aarch64.dmg` | macOS 11+ на Apple Silicon, 40 МБ |
-| `anilume-0.3.0-macos-arm64-portable.zip` | то же без установки |
-| `anilume_0.3.0_x64-setup.exe` | Windows 10/11 x64, 52 МБ |
-| `anilume_0.3.0_x64_en-US.msi` | он же в MSI, 64 МБ |
-| `anilume-0.3.0-windows-x64-portable.zip` | без установки |
+| `anilume_0.3.1_aarch64.dmg` | macOS 11+ на Apple Silicon, 40 МБ |
+| `anilume-0.3.1-macos-arm64-portable.zip` | то же без установки |
+| `anilume_0.3.1_x64-setup.exe` | Windows 10/11 x64, 52 МБ |
+| `anilume_0.3.1_x64_en-US.msi` | он же в MSI, 64 МБ |
+| `anilume-0.3.1-windows-x64-portable.zip` | без установки |
 
 Портативные сборки запускаются через `anilume-portable.cmd`
 (`anilume-portable.command` на macOS): база, история и скачанные серии лягут
@@ -266,7 +268,7 @@ python scripts/design_lint.py   # правила оформления
 для macOS и Windows:
 
 ```bash
-python scripts/make_icon.py --source assets/logo.png --generate
+python scripts/make_icon.py --source assets/logo.png --keep --generate
 ```
 
 Rust-ядро вынесено в отдельный крейт от Tauri-оболочки намеренно: оболочке

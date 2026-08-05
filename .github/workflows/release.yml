@@ -102,6 +102,16 @@ jobs:
       - name: Установить зависимости интерфейса
         run: npm ci
 
+      - name: Пересобрать иконку из логотипа
+        shell: bash
+        run: |
+          if [ -f assets/logo.png ]; then
+            python -m pip install --quiet Pillow
+            python scripts/make_icon.py --source assets/logo.png --keep --generate
+          else
+            echo "assets/logo.png нет — оставляем иконку, которая лежит в репозитории"
+          fi
+
       - name: Собрать приложение
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
