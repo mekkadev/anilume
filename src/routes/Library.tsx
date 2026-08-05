@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { relativeTime } from "../lib/format";
-import { navigate, openPalette, reportError, sourceName } from "../lib/store";
+import { navigate, openPalette, reportError } from "../lib/store";
 import type { LibraryEntry, LibraryStatus } from "../lib/types";
 
 const TABS: { key: LibraryStatus | "all"; label: string }[] = [
@@ -104,7 +104,7 @@ export function Library() {
                   <div class="library-row__body">
                     <div class="library-row__title">{entry.title}</div>
                     <div class="library-row__meta">
-                      {sourceName(entry.source)} · обновлено {relativeTime(entry.updatedAt)}
+                      обновлено {relativeTime(entry.updatedAt)}
                     </div>
                   </div>
                 </button>

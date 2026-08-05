@@ -11,15 +11,22 @@ import {
 
 import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
+import { ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
+import { ensureArt } from "../lib/art";
+import { normalise } from "../lib/match";
 import { pending, settled } from "../lib/resource";
-import { activeSource, navigate, sourceName, sources } from "../lib/store";
-import type { AnimeCard } from "../lib/types";
+import { navigate, sources } from "../lib/store";
+import type { AnimeCard, DiscoverCard } from "../lib/types";
 
 const DEBOUNCE = 300;
 
+interface Results {
+  shiki: DiscoverCard[];
+  fallback: AnimeCard[];
+}
+
 export function Search(props: { query: string }) {
-  const [everywhere, setEverywhere] = createSignal(false);
   const [draft, setDraft] = createSignal(props.query);
   const [needle, setNeedle] = createSignal(props.query);
   let field: HTMLInputElement | undefined;
@@ -44,27 +51,56 @@ export function Search(props: { query: string }) {
   };
 
   const [resultsRes] = createResource(
-    () => [needle(), everywhere(), activeSource()] as const,
-    async ([query, all, source]) => {
-      if (query.trim().length === 0) return { groups: [], failures: [] };
-      if (!all) {
-        const { items } = await api.search(source, query);
-        return { groups: [{ source, items }], failures: [] };
+    needle,
+    async (query): Promise<Results> => {
+      if (query.length === 0) return { shiki: [], fallback: [] };
+
+      let shiki: DiscoverCard[] = [];
+      try {
+        shiki = await api.discoverSearch({ query, order: "popularity" });
+      } catch {
+        shiki = [];
       }
+      if (shiki.length > 0) return { shiki, fallback: [] };
 
       const keys = sources().map((item) => item.key);
-      const result = await api.searchMulti(keys, query);
-      return {
-        groups: result.groups.filter((group) => group.items.length > 0),
-        failures: result.failures,
-      };
+      const result = await api.searchMulti(keys, query).catch(() => null);
+      if (!result) return { shiki: [], fallback: [] };
+
+      const seen = new Set<string>();
+      const flat: AnimeCard[] = [];
+      for (const group of result.groups) {
+        for (const card of group.items) {
+          const key = `${normalise(card.title)}:${card.meta.year ?? ""}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          flat.push(card);
+        }
+      }
+      return { shiki: [], fallback: flat };
     },
   );
 
   const results = () => settled(resultsRes);
 
-  const total = () =>
-    (results()?.groups ?? []).reduce((sum, group) => sum + group.items.length, 0);
+  createEffect(() => {
+    const ids = (results()?.shiki ?? []).map((card) => card.id);
+    if (ids.length > 0) void ensureArt(ids);
+  });
+
+  const total = () => {
+    const found = results();
+    return found ? found.shiki.length + found.fallback.length : 0;
+  };
+
+  const openShiki = (card: DiscoverCard) =>
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.originalTitle],
+      year: card.year,
+      shikiId: card.id,
+    });
 
   const openCard = (card: AnimeCard) =>
     navigate({
@@ -81,21 +117,12 @@ export function Search(props: { query: string }) {
         <div>
           <h1 class="page-title">Поиск</h1>
           <p class="page-sub">
-            <Show when={needle().length > 0} fallback="По названию, в выбранном источнике или во всех сразу">
+            <Show when={needle().length > 0} fallback="По названию — на русском, ромадзи или английском">
               <Show when={!pending(resultsRes)} fallback="Ищем…">
                 «{needle()}» — найдено: {total()}
               </Show>
             </Show>
           </p>
-        </div>
-
-        <div class="segment">
-          <button data-active={!everywhere()} onClick={() => setEverywhere(false)}>
-            {sourceName(activeSource())}
-          </button>
-          <button data-active={everywhere()} onClick={() => setEverywhere(true)}>
-            Везде
-          </button>
         </div>
       </div>
 
@@ -114,59 +141,47 @@ export function Search(props: { query: string }) {
       </form>
 
       <Show when={needle().length > 0} fallback={<div class="empty" />}>
-      <Show
-        when={!pending(resultsRes)}
-        fallback={
-          <div class="poster-grid">
-            <Index each={Array(10).fill(0)}>{() => <PosterSkeleton />}</Index>
-          </div>
-        }
-      >
         <Show
-          when={total() > 0}
+          when={!pending(resultsRes)}
           fallback={
-            <div class="empty">
-              <div class="empty__title">Ничего не найдено</div>
-              <p>Попробуйте другое написание или поищите во всех источниках</p>
-              <Show when={!everywhere()}>
-                <button class="btn btn--primary" onClick={() => setEverywhere(true)}>
-                  Искать везде
-                </button>
-              </Show>
+            <div class="poster-grid">
+              <Index each={Array(10).fill(0)}>{() => <PosterSkeleton />}</Index>
             </div>
           }
         >
-          <For each={results()?.groups}>
-            {(group) => (
+          <Show
+            when={total() > 0}
+            fallback={
+              <div class="empty">
+                <div class="empty__title">Ничего не найдено</div>
+                <p>Попробуйте оригинальное или английское название</p>
+              </div>
+            }
+          >
+            <Show when={(results()?.shiki ?? []).length > 0}>
+              <div class="poster-grid">
+                <For each={results()?.shiki}>
+                  {(card) => <ShikiCard card={card} onOpen={openShiki} />}
+                </For>
+              </div>
+            </Show>
+
+            <Show when={(results()?.fallback ?? []).length > 0}>
               <section class="section">
-                <Show when={everywhere()}>
-                  <div class="section__head">
-                    <h2 class="section__title">{sourceName(group.source)}</h2>
-                    <span class="page-sub">{group.items.length}</span>
-                  </div>
-                </Show>
+                <div class="section__head">
+                  <span class="page-sub">
+                    Каталог не ответил — результаты напрямую из плееров
+                  </span>
+                </div>
                 <div class="poster-grid">
-                  <For each={group.items}>
+                  <For each={results()?.fallback}>
                     {(card) => <PosterCard card={card} onOpen={openCard} />}
                   </For>
                 </div>
               </section>
-            )}
-          </For>
+            </Show>
+          </Show>
         </Show>
-
-        <Show when={(results()?.failures ?? []).length > 0}>
-          <div class="failures">
-            <For each={results()?.failures}>
-              {(failure) => (
-                <span class="chip chip--warning">
-                  {sourceName(failure.source)}: {failure.error.message}
-                </span>
-              )}
-            </For>
-          </div>
-        </Show>
-      </Show>
       </Show>
     </div>
   );

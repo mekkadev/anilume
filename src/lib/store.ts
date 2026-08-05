@@ -70,20 +70,10 @@ const [activeSource, setActiveSourceSignal] = createSignal<string>("anilibria");
 
 export { activeSource, sources };
 
-const SOURCE_SETTING = "ui.source";
-
 export async function loadSources() {
   const result = await api.sources();
   setSources(result.sources);
-
-  const stored = await api.settingGet(SOURCE_SETTING);
-  const known = result.sources.some((s) => s.key === stored);
-  setActiveSourceSignal(known && stored ? stored : result.default);
-}
-
-export function setActiveSource(key: string) {
-  setActiveSourceSignal(key);
-  void api.settingSet(SOURCE_SETTING, key);
+  setActiveSourceSignal(result.default);
 }
 
 export function sourceName(key: string) {

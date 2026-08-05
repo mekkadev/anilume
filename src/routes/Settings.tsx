@@ -5,7 +5,7 @@ import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { extractToken, formatBytes, plural } from "../lib/format";
-import { activeSource, pushToast, reportError, setActiveSource, sources } from "../lib/store";
+import { pushToast, reportError } from "../lib/store";
 
 const OOB = "urn:ietf:wg:oauth:2.0:oob";
 const SERVER_LABELS: Record<string, string> = {
@@ -163,42 +163,9 @@ export function Settings() {
       <div class="page-head">
         <div>
           <h1 class="page-title">Настройки</h1>
-          <p class="page-sub">Источники и синхронизация</p>
+          <p class="page-sub">Синхронизация, качество и данные</p>
         </div>
       </div>
-
-      <section class="panel">
-        <h2 class="panel__title">Источник по умолчанию</h2>
-        <p class="panel__hint">
-          Каталог и поиск используют выбранный источник. Часть из них отдаёт контент
-          только с IP СНГ.
-        </p>
-
-        <div class="source-cards">
-          <For each={sources()}>
-            {(source) => (
-              <button
-                class="source-card"
-                data-active={activeSource() === source.key}
-                onClick={() => setActiveSource(source.key)}
-              >
-                <div class="source-card__head">
-                  <span class="source-card__name">{source.name}</span>
-                  <Show when={activeSource() === source.key}>
-                    <Icon name="check" size={16} />
-                  </Show>
-                </div>
-                <div class="source-card__desc">{source.description}</div>
-                <div class="source-card__notes">
-                  <For each={source.notes}>
-                    {(note) => <span class="chip">{note}</span>}
-                  </For>
-                </div>
-              </button>
-            )}
-          </For>
-        </div>
-      </section>
 
       <section class="panel">
         <h2 class="panel__title">AnimeLib</h2>

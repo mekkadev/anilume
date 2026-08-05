@@ -3,7 +3,8 @@ import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid
 import { api } from "../lib/api";
 import { coverFor, ensureArt } from "../lib/art";
 import { KIND_LABELS } from "./ShikiCard";
-import { activeSource, closePalette, navigate, sourceName } from "../lib/store";
+import { normalise } from "../lib/match";
+import { closePalette, navigate, sources } from "../lib/store";
 import type { AnimeCard, DiscoverCard } from "../lib/types";
 import { Art } from "./Art";
 import { Icon } from "./Icon";
@@ -63,8 +64,19 @@ export function Palette() {
 
       if (found.length === 0) {
         try {
-          const { items } = await api.search(activeSource(), query);
-          found = items.slice(0, LIMIT).map((card) => ({ kind: "source", card }) as Hit);
+          const keys = sources().map((item) => item.key);
+          const result = await api.searchMulti(keys, query);
+          const seen = new Set<string>();
+          const flat: AnimeCard[] = [];
+          for (const group of result.groups) {
+            for (const card of group.items) {
+              const key = `${normalise(card.title)}:${card.meta.year ?? ""}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              flat.push(card);
+            }
+          }
+          found = flat.slice(0, LIMIT).map((card) => ({ kind: "source", card }) as Hit);
           usedFallback = true;
         } catch {
           found = [];
@@ -205,10 +217,10 @@ export function Palette() {
 
             <button class="palette__foot" onClick={openFullSearch}>
               <Icon name="sliders" size={14} />
-              Искать во всех источниках
+              Открыть полный поиск
               <Show when={fallback()}>
                 <span class="palette__note">
-                  каталог не ответил, показан {sourceName(activeSource())}
+                  каталог не ответил — результаты из плееров
                 </span>
               </Show>
             </button>
@@ -231,7 +243,7 @@ function artFor(hit: Hit) {
 
 function metaOf(hit: Hit) {
   if (hit.kind === "source") {
-    const parts = [sourceName(hit.card.source)];
+    const parts: string[] = [];
     if (hit.card.meta.year) parts.push(String(hit.card.meta.year));
     if (hit.card.episodeBadge) parts.push(hit.card.episodeBadge);
     return parts.join(" · ");

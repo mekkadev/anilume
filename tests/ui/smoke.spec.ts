@@ -126,10 +126,13 @@ test("упавший каталог не роняет приложение", asy
   await expect(page.getByText("Каталог Shikimori не отвечает")).toBeVisible({
     timeout: 8000,
   });
-  await expect(page.getByRole("heading", { name: "Сейчас выходит" })).toBeVisible();
-  await expect(page.locator(".card").first()).toBeVisible();
 
-  await page.locator(".card").first().click();
+  await page.keyboard.press("Meta+k");
+  await page.locator(".palette__field input").fill("атака");
+  await expect(page.locator(".palette__hit").first()).toBeVisible({ timeout: 8000 });
+  await expect(page.locator(".palette__note")).toContainText("каталог не ответил");
+
+  await page.keyboard.press("Enter");
   await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
   await expect(page.locator(".episode")).toHaveCount(12);
 });
@@ -140,9 +143,9 @@ test("источник без плееров не роняет страницу 
   await page.locator(".card").first().click();
 
   await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
-  await expect(page.getByText("Источник не отдал плееров для этого тайтла")).toBeVisible({
-    timeout: 8000,
-  });
+  await expect(
+    page.getByText("Ни один вариант пока не отдал плеер для этого тайтла"),
+  ).toBeVisible({ timeout: 8000 });
   await expect(page.locator(".episode")).toHaveCount(12);
 });
 
@@ -168,8 +171,7 @@ test("источник без серий уступает тому, у кого 
   await page.goto("/");
   await page.locator(".card").first().click();
 
-  await expect(page.locator(".toast")).toContainText("нет серий", { timeout: 10000 });
-  await expect(page.locator(".toast")).toContainText("включил", { timeout: 10000 });
+  await expect(page.locator(".toast")).toContainText("переключил", { timeout: 10000 });
 });
 
 test("чужой тайтл с похожим словом не открывается вместо нужного", async ({ page }) => {
@@ -201,10 +203,10 @@ test("текст не вылезает за границы кнопок", async 
   await installTauri(page);
   await page.goto("/");
   await page.locator(".card").first().click();
-  await expect(page.locator(".picker__item").first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(".dub").first()).toBeVisible({ timeout: 10000 });
 
   const escaped = await page.evaluate(() => {
-    const selectors = [".picker__item", ".dub", ".btn", ".menu__item", ".filter"];
+    const selectors = [".dub", ".btn", ".menu__item", ".filter", ".segment button"];
     const bad: string[] = [];
 
     for (const selector of selectors) {
@@ -313,18 +315,81 @@ test("осечка источника переключает на следующ
   await page.goto("/");
   await page.locator(".card").first().click();
   await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
-  await expect(page.locator(".picker__item")).toHaveCount(1);
 
   await page.locator(".episode__main").first().click();
 
-  await expect(page.locator(".toast").first()).toContainText("ищу в других", {
-    timeout: 10000,
-  });
   await expect(page.locator(".toast", { hasText: "включил" })).toBeVisible({
     timeout: 12000,
   });
   await expect(page.locator(".player")).toBeVisible({ timeout: 8000 });
-  await expect(page.locator(".picker__item")).toHaveCount(2);
+});
+
+test("озвучки из всех источников сливаются в один список", async ({ page }) => {
+  await installTauri(page, {
+    overrides: {
+      catalog_search_multi: {
+        query: "",
+        groups: [
+          {
+            source: "animego",
+            items: [{ ...SOURCE_CARD, source: "animego", handle: "s-go", key: "k-go" }],
+          },
+        ],
+        failures: [],
+      },
+      catalog_probe: {
+        probes: [
+          { source: "anilibria", handle: "search-0", quality: 720, dubs: 1, episodes: 12, error: null },
+          { source: "animego", handle: "s-go", quality: 1080, dubs: 2, episodes: 12, error: null },
+        ],
+      },
+      studios_by_prefix: {
+        "search-0": [
+          { handle: "st-a", title: "AniLibria", player: "kodik.info", url: "https://k/a" },
+        ],
+        "s-go": [
+          { handle: "st-b", title: "AniDub", player: "aniboom.one", url: "https://a/b" },
+          { handle: "st-c", title: "AniLibria", player: "kodik.info", url: "https://k/c" },
+        ],
+      },
+      studio_qualities: {
+        qualities: [
+          { handle: "st-a", quality: 720, error: null },
+          { handle: "st-b", quality: 1080, error: null },
+          { handle: "st-c", quality: 720, error: null },
+        ],
+      },
+    },
+  });
+
+  await page.goto("/");
+  await page.locator(".card").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+
+  await expect(page.locator(".dub")).toHaveCount(2, { timeout: 10000 });
+  await expect(page.locator(".dub").first()).toContainText("AniDub");
+  await expect(page.locator(".dub").first()).toContainText("1080p");
+  await expect(page.locator(".dub", { hasText: "AniLibria" })).toHaveCount(1);
+
+  await page.locator(".dub", { hasText: "AniDub" }).click();
+  await expect(
+    page.locator('.dub[data-active="true"]', { hasText: "AniDub" }),
+  ).toBeVisible();
+});
+
+test("поиск переживает молчащий каталог за счёт плееров", async ({ page }) => {
+  await installTauri(page, { failWhen: { discover_search: "" } });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Настройки" }).click();
+  await page.keyboard.press("Meta+k");
+  await page.locator(".palette__field input").fill("дороро");
+  await page.locator(".palette__foot").click();
+
+  await expect(page.getByText("результаты напрямую из плееров")).toBeVisible({
+    timeout: 8000,
+  });
+  await expect(page.locator(".card").first()).toBeVisible();
 });
 
 test("палитра ищет по мере ввода и открывает стрелками", async ({ page }) => {

@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { qualityLabel } from "../lib/format";
-import { openPalette, pushToast, reportError, sourceName } from "../lib/store";
+import { openPalette, pushToast, reportError } from "../lib/store";
 import type { DownloadItem, DownloadStatus } from "../lib/types";
 
 const STATUS_LABELS: Record<DownloadStatus, string> = {
@@ -133,8 +133,7 @@ export function Downloads() {
                     {item.animeTitle} — серия {item.episodeOrdinal}
                   </div>
                   <div class="library-row__meta">
-                    {sourceName(item.source)}
-                    <Show when={item.studio}> · {item.studio}</Show> ·{" "}
+                    <Show when={item.studio}>{item.studio} · </Show>
                     {qualityLabel(item.quality)}
                   </div>
 

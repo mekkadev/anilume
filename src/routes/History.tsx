@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { settled } from "../lib/resource";
 import { formatTime, plural, relativeTime } from "../lib/format";
-import { navigate, openPalette, pushToast, reportError, sourceName } from "../lib/store";
+import { navigate, openPalette, pushToast, reportError } from "../lib/store";
 import type { WatchProgress } from "../lib/types";
 
 interface Bucket {
@@ -145,11 +145,7 @@ export function History() {
                           <div class="library-row__body">
                             <div class="library-row__title">{item.animeTitle}</div>
                             <div class="library-row__meta">
-                              {[
-                                `Серия ${item.episodeOrdinal}`,
-                                item.studio,
-                                sourceName(item.source),
-                              ]
+                              {[`Серия ${item.episodeOrdinal}`, item.studio]
                                 .filter(
                                   (part, index, all) =>
                                     part && all.indexOf(part) === index,

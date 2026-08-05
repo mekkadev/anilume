@@ -35,13 +35,6 @@ export function words(value: string) {
     .filter((word) => word.length > 0 && !NOISE.has(word));
 }
 
-function overlap(left: string[], right: string[]) {
-  if (left.length === 0 || right.length === 0) return 0;
-  const pool = new Set(right);
-  const common = left.filter((word) => pool.has(word)).length;
-  return common / Math.min(left.length, right.length);
-}
-
 function textScore(candidate: string, aliases: string[]): number {
   const flat = normalise(candidate);
   if (!flat) return 0;
@@ -55,13 +48,17 @@ function textScore(candidate: string, aliases: string[]): number {
     if (other === flat) return 100;
 
     const theirs = words(alias);
-    const shared = overlap(mine, theirs);
+    if (mine.length === 0 || theirs.length === 0) continue;
 
-    if (shared < 0.7) continue;
-    if (Math.abs(mine.length - theirs.length) > 2) continue;
+    const pool = new Set(theirs);
+    const common = mine.filter((word) => pool.has(word)).length;
 
-    const gap = Math.abs(mine.length - theirs.length);
-    best = Math.max(best, Math.round(shared * 60) - gap * 6);
+    const coverage = common / theirs.length;
+    const precision = common / mine.length;
+
+    if (coverage < 0.6 || precision < 0.34) continue;
+
+    best = Math.max(best, Math.round((coverage * 0.65 + precision * 0.35) * 60));
   }
   return best;
 }

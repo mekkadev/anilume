@@ -15,8 +15,8 @@ import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt, posterFor } from "../lib/art";
-import { pickMatch } from "../lib/match";
-import { pending, settled } from "../lib/resource";
+import { normalise, pickMatch } from "../lib/match";
+import { broke, pending, settled } from "../lib/resource";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
 import {
   QUALITY_LABELS,
@@ -98,6 +98,14 @@ interface Resolved {
   studio: StudioInfo;
   videos: VideoInfo[];
 }
+
+interface WatchOption {
+  card: AnimeCard;
+  studio: StudioInfo;
+  quality: number | null;
+}
+
+const EXTRA_SOURCES = 4;
 
 function pickBest(items: AnimeCard[], aliases: string[], year?: number | null) {
   return pickMatch(
@@ -262,10 +270,7 @@ export function Title(props: {
     if (empty(best.source)) return;
 
     if (hollow) {
-      pushToast(
-        `У «${sourceName(key)}» нет серий — включил «${sourceName(best.source)}»`,
-        "info",
-      );
+      pushToast("Нашёл вариант, где есть серии — переключил", "info");
     }
 
     setChosen(best.source);
@@ -299,7 +304,6 @@ export function Title(props: {
 
   createEffect(() => {
     if (!decided()) return;
-    if (!missing() && !barren() && detailRes.state !== "errored") return;
     untrack(() => void scanOthers());
   });
 
@@ -437,27 +441,145 @@ export function Title(props: {
         .studioQualities(unknown)
         .then(({ qualities }) => {
           const table = { ...dubQuality() };
+          for (const handle of unknown) {
+            if (!(handle in table)) table[handle] = null;
+          }
           for (const entry of qualities) table[entry.handle] = entry.quality;
           setDubQuality(table);
         })
-        .catch(() => undefined)
+        .catch(() => {
+          const table = { ...dubQuality() };
+          for (const handle of unknown) {
+            if (!(handle in table)) table[handle] = null;
+          }
+          setDubQuality(table);
+        })
         .finally(() => setWeighing(false));
     });
   });
 
-  const bestDub = () => {
-    const values = Object.values(dubQuality()).filter(
-      (value): value is number => typeof value === "number" && value > 0,
+  const [extraStudios, setExtraStudios] = createSignal<Record<string, StudioInfo[]>>({});
+  const [collecting, setCollecting] = createSignal(false);
+  let collected = false;
+
+  const [studioCache, setStudioCache] = createSignal<Record<string, StudioInfo[]>>({});
+
+  createEffect(() => {
+    const list = studios();
+    const key = source();
+    if (!list || list.length === 0 || !key) return;
+    setStudioCache((current) => ({ ...current, [key]: list }));
+  });
+
+  const collectOthers = async () => {
+    if (collected) return;
+    collected = true;
+    setCollecting(true);
+    try {
+      const anchor = nextEpisode()?.ordinal ?? 1;
+      const rest = available()
+        .filter((card) => card.source !== chosen() && !empty(card.source))
+        .sort(
+          (a, b) =>
+            (probes()[b.source]?.quality ?? 0) - (probes()[a.source]?.quality ?? 0),
+        )
+        .slice(0, EXTRA_SOURCES);
+      if (rest.length === 0) return;
+
+      const found = await Promise.all(
+        rest.map(async (card) => {
+          try {
+            const info = await api.anime(card.handle);
+            const episode =
+              info.episodes.find((item) => item.ordinal === anchor) ??
+              info.episodes[0];
+            if (!episode) return null;
+            const { studios: list } = await api.studios(episode.handle);
+            return list.length > 0 ? ([card.source, list] as const) : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const merged: Record<string, StudioInfo[]> = {};
+      const handles: string[] = [];
+      for (const entry of found) {
+        if (!entry) continue;
+        merged[entry[0]] = entry[1];
+        for (const studio of entry[1]) {
+          if (!(studio.handle in dubQuality())) handles.push(studio.handle);
+        }
+      }
+      if (Object.keys(merged).length === 0) return;
+      setExtraStudios((current) => ({ ...current, ...merged }));
+
+      if (handles.length > 0) {
+        const { qualities } = await api
+          .studioQualities(handles)
+          .catch(() => ({ qualities: [] }));
+        if (qualities.length > 0) {
+          const table = { ...dubQuality() };
+          for (const entry of qualities) table[entry.handle] = entry.quality;
+          setDubQuality(table);
+        }
+      }
+    } finally {
+      setCollecting(false);
+    }
+  };
+
+  createEffect(() => {
+    if (!scanned() || probing()) return;
+    if (!detail()) return;
+    if (!settled(studiosRes) && !broke(studiosRes)) return;
+    untrack(() => void collectOthers());
+  });
+
+  const options = createMemo<WatchOption[]>(() => {
+    const seen = new Map<string, WatchOption>();
+
+    const add = (card: AnimeCard | null | undefined, list: StudioInfo[] | undefined) => {
+      if (!card || !list) return;
+      for (const studio of list) {
+        const key = normalise(studio.title) || studio.title;
+        const quality = dubQuality()[studio.handle] ?? null;
+        const prev = seen.get(key);
+        if (!prev || (quality ?? 0) > (prev.quality ?? 0)) {
+          seen.set(key, { card, studio, quality });
+        }
+      }
+    };
+
+    add(active(), studios());
+    const current = chosen();
+    const table = { ...extraStudios(), ...studioCache() };
+    for (const [key, list] of Object.entries(table)) {
+      if (key === current) continue;
+      add(candidates()[key], list);
+    }
+
+    return [...seen.values()].sort(
+      (a, b) =>
+        (b.quality ?? 0) - (a.quality ?? 0) ||
+        a.studio.title.localeCompare(b.studio.title, "ru"),
     );
+  });
+
+  const bestDub = () => {
+    const values = options()
+      .map((option) => option.quality)
+      .filter((value): value is number => typeof value === "number" && value > 0);
     return values.length > 0 ? Math.max(...values) : null;
   };
 
-  const dubsByQuality = () => {
-    const available = [...(studios() ?? [])];
-    return available.sort(
-      (a, b) => (dubQuality()[b.handle] ?? 0) - (dubQuality()[a.handle] ?? 0),
-    );
+  const chooseOption = (option: WatchOption) => {
+    if (option.card.source !== source()) chooseSource(option.card.source);
+    chooseDub(option.studio);
   };
+
+  const optionActive = (option: WatchOption) =>
+    normalise(option.studio.title) === normalise(selectedDub() ?? "");
 
   const orderedEpisodes = createMemo(() => {
     const episodes = [...(detail()?.episodes ?? [])];
@@ -467,7 +589,8 @@ export function Title(props: {
   createEffect(() => {
     const available = studios();
     if (!available || available.length === 0) return;
-    if (weighing()) return;
+    const table = dubQuality();
+    if (available.some((item) => !(item.handle in table))) return;
     if (pickedDub() && available.some((item) => item.title === selectedDub())) return;
 
     void (async () => {
@@ -475,7 +598,10 @@ export function Title(props: {
         ? await api.settingGet(studioSettingKey(source(), animeKey()))
         : null;
       const match = available.find((item) => item.title === remembered);
-      setSelectedDub((match ?? dubsByQuality()[0] ?? available[0]!).title);
+      const ranked = [...available].sort(
+        (a, b) => (dubQuality()[b.handle] ?? 0) - (dubQuality()[a.handle] ?? 0),
+      );
+      setSelectedDub((match ?? ranked[0] ?? available[0]!).title);
       setPickedDub(true);
     })();
   });
@@ -554,7 +680,7 @@ export function Title(props: {
         }
 
         if (!found && !scanned()) {
-          pushToast("Источник не отдал серию — ищу в других", "info");
+          pushToast("Этот вариант не отдал серию — пробую другие", "info");
           await scanOthers();
         }
 
@@ -570,10 +696,7 @@ export function Title(props: {
         }
 
         if (found.card.source !== source()) {
-          pushToast(
-            `«${sourceName(source())}» не отдал серию — включил «${sourceName(found.card.source)}»`,
-            "info",
-          );
+          pushToast("Серия нашлась в другом варианте — включил его", "info");
           chooseSource(found.card.source, false);
         }
 
@@ -906,63 +1029,6 @@ export function Title(props: {
                     </div>
                   </Show>
 
-                  <div class="picker">
-                    <div class="picker__head">
-                      <span class="fact__label">Где смотреть</span>
-                      <Show when={scanning() || probing()}>
-                        <span class="picker__probing">
-                          <span class="spinner" />
-                          {probing() ? "проверяем качество" : "ищем в других источниках"}
-                        </span>
-                      </Show>
-                      <Show when={!scanning() && !probing() && !scanned()}>
-                        <button
-                          class="link-btn"
-                          onClick={() => void scanOthers()}
-                        >
-                          Поискать в других источниках
-                        </button>
-                      </Show>
-                    </div>
-
-                    <div class="picker__row">
-                      <For each={available()}>
-                        {(candidate) => {
-                          const probe = () => probes()[candidate.source];
-                          return (
-                            <button
-                              class="picker__item"
-                              data-active={candidate.source === chosen()}
-                              onClick={() => chooseSource(candidate.source)}
-                            >
-                              <span class="picker__name">
-                                {sourceName(candidate.source)}
-                              </span>
-                              <Show
-                                when={probe()?.quality}
-                                fallback={
-                                  <Show when={probe()?.error}>
-                                    <span class="picker__meta">не отдаёт видео</span>
-                                  </Show>
-                                }
-                              >
-                                <span class="picker__quality">
-                                  {qualityLabel(probe()!.quality!)}
-                                </span>
-                                <Show when={probe()!.dubs > 1}>
-                                  <span class="picker__meta">
-                                    {probe()!.dubs}{" "}
-                                    {plural(probe()!.dubs, "озвучка", "озвучки", "озвучек")}
-                                  </span>
-                                </Show>
-                              </Show>
-                            </button>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </div>
-
                   <div class="title-info__row">
                     <Show when={nextEpisode()}>
                       {(episode) => (
@@ -993,21 +1059,25 @@ export function Title(props: {
 
             <section class="section">
               <div class="section__head">
-                <h2 class="section__title">Озвучка</h2>
-                <Show when={studios()}>
-                  <span class="page-sub">
-                    {studios()!.length}{" "}
-                    {plural(studios()!.length, "вариант", "варианта", "вариантов")}
-                    <Show when={weighing()}>
-                      {" · "}
-                      меряем качество
-                    </Show>
-                    <Show when={!weighing() && bestDub()}>
-                      {" · "}
-                      лучшее {qualityLabel(bestDub()!)}
-                    </Show>
-                  </span>
-                </Show>
+                <h2 class="section__title">Озвучка и плеер</h2>
+                <span class="page-sub">
+                  <Show when={options().length > 0}>
+                    {options().length}{" "}
+                    {plural(options().length, "вариант", "варианта", "вариантов")}
+                  </Show>
+                  <Show when={scanning() || probing() || weighing() || collecting()}>
+                    <Show when={options().length > 0}>{" · "}</Show>
+                    ищем ещё варианты
+                  </Show>
+                  <Show
+                    when={
+                      !weighing() && !collecting() && bestDub()
+                    }
+                  >
+                    {" · "}
+                    лучшее {qualityLabel(bestDub()!)}
+                  </Show>
+                </span>
               </div>
 
               <Show
@@ -1020,37 +1090,49 @@ export function Title(props: {
                 }
               >
                 <Show
-                  when={(studios() ?? []).length > 0}
+                  when={options().length > 0}
                   fallback={
                     <div class="dub-row">
-                      <span class="page-sub">
-                        Источник не отдал плееров для этого тайтла
-                      </span>
+                      <Show
+                        when={scanning() || collecting()}
+                        fallback={
+                          <span class="page-sub">
+                            Ни один вариант пока не отдал плеер для этого тайтла
+                          </span>
+                        }
+                      >
+                        <span class="spinner" />
+                        <span class="page-sub">Собираем варианты…</span>
+                      </Show>
                     </div>
                   }
                 >
                   <div class="dub-row">
-                    <For each={dubsByQuality()}>
-                      {(studio) => {
-                        const height = () => dubQuality()[studio.handle];
-                        return (
-                          <button
-                            class="dub"
-                            data-active={selectedDub() === studio.title}
-                            data-top={height() === bestDub() && Boolean(bestDub())}
-                            onClick={() => chooseDub(studio)}
-                          >
-                            <span class="dub__name">{studio.title}</span>
-                            <Show when={height()}>
-                              <span class="dub__quality">{qualityLabel(height()!)}</span>
-                            </Show>
-                            <span class="dub__player">{playerName(studio.player)}</span>
-                            <Show when={selectedDub() === studio.title}>
-                              <Icon name="check" size={14} />
-                            </Show>
-                          </button>
-                        );
-                      }}
+                    <For each={options()}>
+                      {(option) => (
+                        <button
+                          class="dub"
+                          data-active={optionActive(option)}
+                          data-top={
+                            option.quality === bestDub() && Boolean(bestDub())
+                          }
+                          title={sourceName(option.card.source)}
+                          onClick={() => chooseOption(option)}
+                        >
+                          <span class="dub__name">{option.studio.title}</span>
+                          <Show when={option.quality}>
+                            <span class="dub__quality">
+                              {qualityLabel(option.quality!)}
+                            </span>
+                          </Show>
+                          <span class="dub__player">
+                            {playerName(option.studio.player)}
+                          </span>
+                          <Show when={optionActive(option)}>
+                            <Icon name="check" size={14} />
+                          </Show>
+                        </button>
+                      )}
                     </For>
                   </div>
                 </Show>

@@ -275,6 +275,16 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
             ? { query, items: [{ ...base, title: query, key: `k-${query}` }] }
             : stub;
         }
+        if (cmd === "episode_studios") {
+          const byPrefix = (config.fixtures.studios_by_prefix ?? null) as Record<
+            string,
+            unknown[]
+          > | null;
+          if (byPrefix) {
+            const prefix = String(args?.handle ?? "").split(":")[0]!;
+            if (byPrefix[prefix]) value = { studios: byPrefix[prefix] };
+          }
+        }
         if (cmd === "anime_get") {
           const handle = String(args?.handle ?? "anime");
           const base = config.fixtures.anime_get as {

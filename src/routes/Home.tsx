@@ -11,14 +11,14 @@ import {
 
 import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
-import { PosterCard, PosterSkeleton } from "../components/PosterCard";
+import { PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
 import { bannerFor, ensureArt, posterFor } from "../lib/art";
 import { broke, pending, settled } from "../lib/resource";
 import { formatTime, relativeTime } from "../lib/format";
-import { activeSource, navigate, setAmbient, sourceName } from "../lib/store";
-import type { AnimeCard, ContinueItem, DiscoverCard } from "../lib/types";
+import { navigate, setAmbient } from "../lib/store";
+import type { ContinueItem, DiscoverCard } from "../lib/types";
 
 const HERO_COUNT = 5;
 const HERO_INTERVAL = 9000;
@@ -32,9 +32,8 @@ export function Home() {
     api.discoverSearch({ order: "aired_on", yearFrom: CURRENT_YEAR - 1 }),
   );
   const [bestRes] = createResource(() => api.discoverSearch({ order: "ranked" }));
-  const [ongoingRes, { refetch: refetchOngoing }] = createResource(
-    activeSource,
-    async (source) => (await api.ongoing(source)).items,
+  const [ongoingRes] = createResource(() =>
+    api.discoverSearch({ order: "popularity", status: "ongoing" }),
   );
   const [continueRes] = createResource(() => api.continueWatching(12));
 
@@ -61,6 +60,7 @@ export function Home() {
       ...(popular() ?? []),
       ...(fresh() ?? []),
       ...(best() ?? []),
+      ...(ongoing() ?? []),
       ...(forYou()?.items ?? []),
     ].map((card) => card.id);
     if (ids.length > 0) void ensureArt(ids);
@@ -123,15 +123,6 @@ export function Home() {
   });
 
   onCleanup(() => setAmbient(null));
-
-  const openCard = (card: AnimeCard) =>
-    navigate({
-      name: "title",
-      query: card.title,
-      aliases: [card.meta.altTitle ?? ""],
-      card,
-      year: card.meta.year,
-    });
 
   const openShiki = (card: DiscoverCard) =>
     navigate({
@@ -235,8 +226,8 @@ export function Home() {
         <div class="empty">
           <div class="empty__title">Каталог Shikimori не отвечает</div>
           <p>
-            Подборки и описания подтянутся, когда он вернётся. Список ниже —
-            из выбранного источника, он работает сам по себе.
+            Подборки и описания подтянутся, когда он вернётся. Поиск по названию
+            через ⌘K работает и без него.
           </p>
         </div>
       </Show>
@@ -267,31 +258,12 @@ export function Home() {
         onOpen={openShiki}
       />
 
-      <Row title="Сейчас выходит" hint={sourceName(activeSource())}>
-        <Show
-          when={!pending(ongoingRes)}
-          fallback={<SkeletonTrack />}
-        >
-          <Show
-            when={(ongoing() ?? []).length > 0}
-            fallback={
-              <div class="empty">
-                <div class="empty__title">Источник не ответил</div>
-                <p>Выберите другой источник внизу рельса</p>
-                <button class="btn btn--primary" onClick={() => void refetchOngoing()}>
-                  Повторить
-                </button>
-              </div>
-            }
-          >
-            <div class="row__track">
-              <For each={ongoing()}>
-                {(card) => <PosterCard card={card} onOpen={openCard} />}
-              </For>
-            </div>
-          </Show>
-        </Show>
-      </Row>
+      <ShikiRow
+        title="Сейчас выходит"
+        items={ongoing()}
+        loading={pending(ongoingRes)}
+        onOpen={openShiki}
+      />
 
       <ShikiRow
         title="Лучшее"
@@ -410,7 +382,6 @@ function ResumeCard(props: { item: ContinueItem; onOpen: () => void }) {
           <span style={{ width: `${percent()}%` }} />
         </div>
         <div class="resume__foot">
-          <span>{sourceName(props.item.source)}</span>
           <span>{relativeTime(props.item.updatedAt)}</span>
         </div>
       </div>
