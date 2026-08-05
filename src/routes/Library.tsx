@@ -2,6 +2,7 @@ import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { settled } from "../lib/resource";
 import { relativeTime } from "../lib/format";
 import { navigate, reportError, sourceName } from "../lib/store";
 import type { LibraryEntry, LibraryStatus } from "../lib/types";
@@ -19,9 +20,10 @@ export function Library() {
   const [tab, setTab] = createSignal<LibraryStatus | "all">("all");
   const [opening, setOpening] = createSignal<string | null>(null);
 
-  const [entries, { refetch }] = createResource(tab, (status) =>
+  const [entriesRes, { refetch }] = createResource(tab, (status) =>
     api.libraryList(status === "all" ? undefined : status),
   );
+  const entries = () => settled(entriesRes);
 
   const open = async (entry: LibraryEntry) => {
     setOpening(entry.animeKey);

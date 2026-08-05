@@ -36,6 +36,8 @@ const cards = TITLES.map((title, index) => ({
   meta: meta(),
 }));
 
+export const SOURCE_CARD = cards[0];
+
 const episodes = Array.from({ length: 12 }, (_, i) => ({
   handle: `episode-${i}`,
   ordinal: i + 1,
@@ -165,6 +167,7 @@ export interface HarnessOptions {
   stalled?: string[];
   overrides?: Record<string, unknown>;
   latencyMs?: number;
+  failWhen?: Record<string, string>;
 }
 
 export async function installTauri(page: Page, options: HarnessOptions = {}) {
@@ -172,6 +175,7 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
     fixtures: { ...FIXTURES, ...(options.overrides ?? {}) },
     stalled: options.stalled ?? [],
     latency: options.latencyMs ?? 40,
+    failWhen: options.failWhen ?? {},
   };
 
   await page.addInitScript((config: typeof payload) => {
@@ -187,6 +191,16 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
         if (cmd.startsWith("plugin:")) return Promise.resolve(0);
         (anyWindow.__CALLS__ as string[]).push(cmd);
 
+        const trigger = (config.failWhen as Record<string, string>)[cmd];
+        if (trigger !== undefined && JSON.stringify(args ?? {}).includes(trigger)) {
+          return new Promise((_, reject) =>
+            setTimeout(
+              () => reject({ kind: "upstream", message: `«${cmd}» не отдал данные` }),
+              config.latency,
+            ),
+          );
+        }
+
         let value = cmd in config.fixtures ? config.fixtures[cmd] : null;
 
         if (cmd === "catalog_search") {
@@ -199,9 +213,18 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
           };
         }
         if (cmd === "anime_get") {
+          const handle = String(args?.handle ?? "anime");
+          const base = config.fixtures.anime_get as {
+            title: string;
+            episodes: { ordinal: number; title: string }[];
+          };
           value = {
-            ...(config.fixtures.anime_get as object),
-            title: anyWindow.__QUERY__ ?? (config.fixtures.anime_get as { title: string }).title,
+            ...base,
+            title: anyWindow.__QUERY__ ?? base.title,
+            episodes: base.episodes.map((episode) => ({
+              ...episode,
+              handle: `${handle}:ep-${episode.ordinal}`,
+            })),
           };
         }
 

@@ -14,6 +14,7 @@ import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt } from "../lib/art";
+import { pending, settled } from "../lib/resource";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
 import {
   QUALITY_LABELS,
@@ -66,6 +67,14 @@ function studioSettingKey(source: string, animeKey: string) {
 
 function sourceSettingKey(query: string) {
   return `source:${query.trim().toLowerCase()}`;
+}
+
+interface Resolved {
+  card: AnimeCard;
+  info: AnimeDetail;
+  episode: EpisodeInfo;
+  studio: StudioInfo;
+  videos: VideoInfo[];
 }
 
 function pickBest(items: AnimeCard[], query: string) {
@@ -210,9 +219,9 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
   const source = () => active()?.source ?? "";
   const animeKey = () => active()?.key ?? "";
 
-  const chooseSource = (key: string) => {
+  const chooseSource = (key: string, byHand = true) => {
     if (key === chosen()) return;
-    setPinned(true);
+    if (byHand) setPinned(true);
     setChosen(key);
     void api.settingSet(sourceSettingKey(props.query), key).catch(() => undefined);
   };
@@ -221,13 +230,13 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     () => active()?.handle ?? null,
     (handle) => api.anime(handle),
   );
-  const detail = () => (detailRes.state === "ready" ? detailRes() : undefined);
+  const detail = () => settled(detailRes);
 
-  const settled = () =>
+  const decided = () =>
     missing() || detailRes.state === "ready" || detailRes.state === "errored";
 
   createEffect(() => {
-    if (!settled()) return;
+    if (!decided()) return;
     untrack(() => void scanOthers());
   });
 
@@ -255,7 +264,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     },
   );
 
-  const shiki = () => (shikiRes.state === "ready" ? shikiRes() : null);
+  const shiki = () => settled(shikiRes) ?? null;
 
   const [relatedRes] = createResource(
     () => shiki()?.id ?? null,
@@ -272,11 +281,11 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     (topicId) => api.discoverComments(topicId, 15),
   );
 
-  const related = () => (relatedRes.state === "ready" ? relatedRes() : undefined);
-  const similar = () => (similarRes.state === "ready" ? similarRes() : undefined);
-  const comments = () => (commentsRes.state === "ready" ? commentsRes() : undefined);
-  const progress = () => (progressRes.state === "ready" ? progressRes() : undefined);
-  const libraryEntry = () => (libraryRes.state === "ready" ? libraryRes() : undefined);
+  const related = () => settled(relatedRes);
+  const similar = () => settled(similarRes);
+  const comments = () => settled(commentsRes);
+  const progress = () => settled(progressRes);
+  const libraryEntry = () => settled(libraryRes);
 
   const heroArt = () => shiki()?.art[0] ?? bannerFor(shiki()?.id) ?? null;
   const poster = () =>
@@ -321,10 +330,11 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     return finished ? episodes[index + 1] ?? episodes[index] : episodes[index];
   };
 
-  const [studios] = createResource(
+  const [studiosRes] = createResource(
     () => nextEpisode()?.handle,
     (handle) => api.studios(handle).then((result) => result.studios),
   );
+  const studios = () => settled(studiosRes);
 
   const orderedEpisodes = createMemo(() => {
     const episodes = [...(detail()?.episodes ?? [])];
@@ -364,6 +374,26 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     return available.find((item) => item.title === selectedDub()) ?? available[0]!;
   }
 
+  async function resolveFrom(
+    card: AnimeCard,
+    ordinal: number,
+    known?: AnimeDetail,
+  ): Promise<Resolved | null> {
+    const info = known ?? (await api.anime(card.handle));
+    const target = info.episodes.find((item) => item.ordinal === ordinal);
+    if (!target) return null;
+
+    const { studios: available } = await api.studios(target.handle);
+    if (available.length === 0) return null;
+
+    const studio =
+      available.find((item) => item.title === selectedDub()) ?? available[0]!;
+    const { videos } = await api.videos(studio.handle);
+    if (videos.length === 0) return null;
+
+    return { card, info, episode: target, studio, videos };
+  }
+
   const play = async (episode: EpisodeInfo) => {
     const info = detail();
     if (!info) return;
@@ -376,6 +406,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
 
       let studioTitle: string | null = null;
       let videos: VideoInfo[];
+      let played: Resolved | null = null;
 
       if (downloaded) {
         const { convertFileSrc } = await import("@tauri-apps/api/core");
@@ -389,18 +420,41 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
           },
         ];
       } else {
-        const studio = await resolveStudio(episode);
-        if (!studio) return;
+        const current = active();
+        const queue = current
+          ? [current, ...available().filter((item) => item.source !== current.source)]
+          : available();
 
-        studioTitle = studio.title;
-        const resolved = await api.videos(studio.handle);
-        if (resolved.videos.length === 0) {
-          pushToast(`«${studio.title}» не отдал видео — выберите другую озвучку`, "error");
+        let found: Resolved | null = null;
+        for (const candidate of queue) {
+          found = await resolveFrom(
+            candidate,
+            episode.ordinal,
+            candidate.source === source() ? info : undefined,
+          ).catch(() => null);
+          if (found) break;
+        }
+
+        if (!found) {
+          pushToast("Ни один источник не отдал эту серию", "error");
           return;
         }
-        videos = resolved.videos;
+
+        if (found.card.source !== source()) {
+          pushToast(
+            `«${sourceName(source())}» не отдал серию — включил «${sourceName(found.card.source)}»`,
+            "info",
+          );
+          chooseSource(found.card.source, false);
+        }
+
+        played = found;
+        studioTitle = found.studio.title;
+        videos = found.videos;
       }
 
+      const shown = played?.info ?? info;
+      const ordinal = played?.episode.ordinal ?? episode.ordinal;
       const saved = progressFor(episode.ordinal);
       const resumeAt =
         saved && saved.durationSec > 0 && saved.positionSec < saved.durationSec * 0.92
@@ -408,20 +462,20 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
           : 0;
 
       openPlayer({
-        source: source(),
-        animeKey: animeKey(),
-        animeTitle: info.title,
-        poster: info.poster,
-        episodes: info.episodes,
-        episodeIndex: info.episodes.findIndex((ep) => ep.ordinal === episode.ordinal),
+        source: played?.card.source ?? source(),
+        animeKey: played?.card.key ?? animeKey(),
+        animeTitle: shown.title,
+        poster: shown.poster,
+        episodes: shown.episodes,
+        episodeIndex: shown.episodes.findIndex((ep) => ep.ordinal === ordinal),
         studioTitle,
         videos,
         startAt: resumeAt,
         qualityIndex: downloaded ? 0 : pickQualityIndex(videos, qualityPref()),
         autoplayNext: autoplayNext(),
         offline: Boolean(downloaded),
-        malId: info.meta.malId ?? null,
-        episodeNumbers: info.episodes.map((item) => item.ordinal),
+        malId: shown.meta.malId ?? null,
+        episodeNumbers: shown.episodes.map((item) => item.ordinal),
       });
     } catch (error) {
       reportError(error);
@@ -602,7 +656,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
         when={detail()}
         fallback={
           <Show
-            when={settled() && scanned() && available().length === 0}
+            when={decided() && scanned() && available().length === 0}
             fallback={<TitleSkeleton />}
           >
             <div class="empty">
@@ -809,7 +863,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
               </div>
 
               <Show
-                when={!studios.loading}
+                when={!pending(studiosRes)}
                 fallback={
                   <div class="dub-row">
                     <span class="spinner" />

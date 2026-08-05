@@ -2,6 +2,7 @@ import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { settled } from "../lib/resource";
 import { formatTime, plural, relativeTime } from "../lib/format";
 import { navigate, pushToast, reportError, sourceName } from "../lib/store";
 import type { WatchProgress } from "../lib/types";
@@ -25,7 +26,8 @@ function bucketOf(unixSeconds: number): string {
 }
 
 export function History() {
-  const [history, { refetch }] = createResource(() => api.watchHistory(300));
+  const [historyRes, { refetch }] = createResource(() => api.watchHistory(300));
+  const history = () => settled(historyRes);
   const [opening, setOpening] = createSignal<string | null>(null);
 
   const buckets = createMemo<Bucket[]>(() => {

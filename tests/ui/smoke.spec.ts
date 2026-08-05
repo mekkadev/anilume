@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { TITLES, installTauri, watchForCrashes } from "./harness";
+import { SOURCE_CARD, TITLES, installTauri, watchForCrashes } from "./harness";
 
 const crashes: string[] = [];
 
@@ -96,6 +96,66 @@ test("серия открывает плеер", async ({ page }) => {
 
   await page.keyboard.press("Escape");
   await expect(page.locator(".player")).toHaveCount(0);
+});
+
+test("упавший каталог не роняет приложение", async ({ page }) => {
+  await installTauri(page, {
+    failWhen: {
+      discover_search: "",
+      discover_title: "",
+      discover_match: "",
+      discover_similar: "",
+      discover_related: "",
+      discover_comments: "",
+    },
+  });
+  await page.goto("/");
+
+  await expect(page.getByText("Каталог Shikimori не отвечает")).toBeVisible({
+    timeout: 8000,
+  });
+  await expect(page.getByRole("heading", { name: "Сейчас выходит" })).toBeVisible();
+  await expect(page.locator(".card").first()).toBeVisible();
+
+  await page.locator(".card").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator(".episode")).toHaveCount(12);
+});
+
+test("источник без плееров не роняет страницу аниме", async ({ page }) => {
+  await installTauri(page, { failWhen: { episode_studios: "" } });
+  await page.goto("/");
+  await page.locator(".card").first().click();
+
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText("Источник не отдал плееров для этого тайтла")).toBeVisible({
+    timeout: 8000,
+  });
+  await expect(page.locator(".episode")).toHaveCount(12);
+});
+
+test("осечка источника переключает на следующий сама", async ({ page }) => {
+  await installTauri(page, {
+    failWhen: { episode_studios: "search-0:" },
+    overrides: {
+      catalog_search_multi: {
+        query: "",
+        groups: [
+          { source: "animego", items: [{ ...SOURCE_CARD, source: "animego", handle: "s-go" }] },
+        ],
+        failures: [],
+      },
+    },
+  });
+  await page.goto("/");
+  await page.locator(".card").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator(".picker__item")).toHaveCount(2, { timeout: 8000 });
+
+  await page.locator(".episode__main").first().click();
+
+  await expect(page.locator(".toast")).toContainText("включил", { timeout: 10000 });
+  await expect(page.locator(".player")).toBeVisible({ timeout: 8000 });
 });
 
 test("палитра ищет по мере ввода и открывает стрелками", async ({ page }) => {

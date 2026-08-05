@@ -2,6 +2,7 @@ import { For, Show, createResource, createSignal, onMount } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { settled } from "../lib/resource";
 import { qualityLabel } from "../lib/format";
 import { pushToast, reportError, sourceName } from "../lib/store";
 import type { DownloadItem, DownloadStatus } from "../lib/types";
@@ -15,8 +16,10 @@ const STATUS_LABELS: Record<DownloadStatus, string> = {
 };
 
 export function Downloads() {
-  const [items, { refetch, mutate }] = createResource(() => api.downloadsList());
-  const [available] = createResource(() => api.downloadsAvailable());
+  const [itemsRes, { refetch, mutate }] = createResource(() => api.downloadsList());
+  const [availableRes] = createResource(() => api.downloadsAvailable());
+  const items = () => settled(itemsRes);
+  const available = () => settled(availableRes);
   const [busy, setBusy] = createSignal<number | null>(null);
 
   onMount(() => {

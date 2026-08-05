@@ -2,6 +2,7 @@ import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
+import { settled } from "../lib/resource";
 import { extractToken, formatBytes, plural } from "../lib/format";
 import { activeSource, pushToast, reportError, setActiveSource, sources } from "../lib/store";
 
@@ -14,11 +15,14 @@ const SERVER_LABELS: Record<string, string> = {
 const LOOPBACK = "http://127.0.0.1:53682/";
 
 export function Settings() {
-  const [status, { refetch }] = createResource(() => api.shikimoriStatus());
-  const [animelib, { refetch: refetchAnimelib }] = createResource(() =>
+  const [statusRes, { refetch }] = createResource(() => api.shikimoriStatus());
+  const [animelibRes, { refetch: refetchAnimelib }] = createResource(() =>
     api.animelibServers(),
   );
-  const [cache, { refetch: refetchCache }] = createResource(() => api.cacheStats());
+  const [cacheRes, { refetch: refetchCache }] = createResource(() => api.cacheStats());
+  const status = () => settled(statusRes);
+  const animelib = () => settled(animelibRes);
+  const cache = () => settled(cacheRes);
   const [libToken, setLibToken] = createSignal("");
   const [savingLib, setSavingLib] = createSignal(false);
 

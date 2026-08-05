@@ -12,6 +12,7 @@ import {
 import { Icon } from "../components/Icon";
 import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { api } from "../lib/api";
+import { pending, settled } from "../lib/resource";
 import { activeSource, navigate, sourceName, sources } from "../lib/store";
 import type { AnimeCard } from "../lib/types";
 
@@ -42,7 +43,7 @@ export function Search(props: { query: string }) {
     setNeedle(draft().trim());
   };
 
-  const [results] = createResource(
+  const [resultsRes] = createResource(
     () => [needle(), everywhere(), activeSource()] as const,
     async ([query, all, source]) => {
       if (query.trim().length === 0) return { groups: [], failures: [] };
@@ -60,6 +61,8 @@ export function Search(props: { query: string }) {
     },
   );
 
+  const results = () => settled(resultsRes);
+
   const total = () =>
     (results()?.groups ?? []).reduce((sum, group) => sum + group.items.length, 0);
 
@@ -73,7 +76,7 @@ export function Search(props: { query: string }) {
           <h1 class="page-title">Поиск</h1>
           <p class="page-sub">
             <Show when={needle().length > 0} fallback="По названию, в выбранном источнике или во всех сразу">
-              <Show when={!results.loading} fallback="Ищем…">
+              <Show when={!pending(resultsRes)} fallback="Ищем…">
                 «{needle()}» — найдено: {total()}
               </Show>
             </Show>
@@ -106,7 +109,7 @@ export function Search(props: { query: string }) {
 
       <Show when={needle().length > 0} fallback={<div class="empty" />}>
       <Show
-        when={!results.loading}
+        when={!pending(resultsRes)}
         fallback={
           <div class="poster-grid">
             <Index each={Array(10).fill(0)}>{() => <PosterSkeleton />}</Index>

@@ -14,6 +14,7 @@ import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt } from "../lib/art";
+import { broke, pending, settled } from "../lib/resource";
 import { formatTime, relativeTime } from "../lib/format";
 import { activeSource, navigate, setAmbient, sourceName } from "../lib/store";
 import type { AnimeCard, ContinueItem, DiscoverCard } from "../lib/types";
@@ -23,20 +24,26 @@ const HERO_INTERVAL = 9000;
 const CURRENT_YEAR = new Date().getFullYear();
 
 export function Home() {
-  const [popular] = createResource(() =>
+  const [popularRes] = createResource(() =>
     api.discoverSearch({ order: "popularity" }),
   );
-  const [fresh] = createResource(() =>
+  const [freshRes] = createResource(() =>
     api.discoverSearch({ order: "aired_on", yearFrom: CURRENT_YEAR - 1 }),
   );
-  const [best] = createResource(() => api.discoverSearch({ order: "ranked" }));
-  const [ongoing, { refetch: refetchOngoing }] = createResource(
+  const [bestRes] = createResource(() => api.discoverSearch({ order: "ranked" }));
+  const [ongoingRes, { refetch: refetchOngoing }] = createResource(
     activeSource,
     async (source) => (await api.ongoing(source)).items,
   );
-  const [continueList] = createResource(() => api.continueWatching(12));
+  const [continueRes] = createResource(() => api.continueWatching(12));
 
-  const [forYou] = createResource(
+  const popular = () => settled(popularRes);
+  const fresh = () => settled(freshRes);
+  const best = () => settled(bestRes);
+  const ongoing = () => settled(ongoingRes);
+  const continueList = () => settled(continueRes);
+
+  const [forYouRes] = createResource(
     () => continueList()?.[0]?.animeTitle ?? null,
     async (title) => {
       const anchor = await api.discoverMatch(title);
@@ -45,6 +52,7 @@ export function Home() {
       return { anchor, items };
     },
   );
+  const forYou = () => settled(forYouRes);
 
 
   createEffect(() => {
@@ -126,7 +134,7 @@ export function Home() {
 
   return (
     <div class="fade-in">
-      <Show when={hero()} fallback={<Show when={popular.loading}><div class="hero hero--empty" /></Show>}>
+      <Show when={hero()} fallback={<Show when={pending(popularRes)}><div class="hero hero--empty" /></Show>}>
         {(current) => (
           <section class="hero">
             <div class="hero__art" data-fallback={!heroArt()}>
@@ -203,7 +211,7 @@ export function Home() {
         )}
       </Show>
 
-      <Show when={popular.error && !popular.loading}>
+      <Show when={broke(popularRes)}>
         <div class="empty">
           <div class="empty__title">Каталог Shikimori не отвечает</div>
           <p>
@@ -228,20 +236,20 @@ export function Home() {
       <ShikiRow
         title="Популярное"
         items={popular()}
-        loading={popular.loading}
+        loading={pending(popularRes)}
         onOpen={openShiki}
       />
 
       <ShikiRow
         title="Новинки"
         items={fresh()}
-        loading={fresh.loading}
+        loading={pending(freshRes)}
         onOpen={openShiki}
       />
 
       <Row title="Сейчас выходит" hint={sourceName(activeSource())}>
         <Show
-          when={!ongoing.loading}
+          when={!pending(ongoingRes)}
           fallback={<SkeletonTrack />}
         >
           <Show
@@ -268,7 +276,7 @@ export function Home() {
       <ShikiRow
         title="Лучшее"
         items={best()}
-        loading={best.loading}
+        loading={pending(bestRes)}
         onOpen={openShiki}
       />
 

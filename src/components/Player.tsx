@@ -28,6 +28,14 @@ const CONTROLS_TIMEOUT = 2600;
 const PROGRESS_INTERVAL = 5000;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const NEXT_LEAD_SEC = 15;
+const PREFETCH_LEAD_SEC = 75;
+
+interface ReadyEpisode {
+  index: number;
+  dub: string;
+  studios: StudioInfo[];
+  videos: VideoInfo[];
+}
 const SUBTITLE_TYPES = ".vtt,.srt,.txt";
 
 export function Player(props: { request: PlaybackRequest }) {
@@ -66,6 +74,8 @@ export function Player(props: { request: PlaybackRequest }) {
   const [switchingTo, setSwitchingTo] = createSignal<number | null>(null);
   const [skips, setSkips] = createSignal<{ kind: string; start: number; end: number }[]>([]);
   const [nextDismissed, setNextDismissed] = createSignal(false);
+  const [ready, setReady] = createSignal<ReadyEpisode | null>(null);
+  let prefetching = false;
 
   const activeSkip = () =>
     skips().find((item) => current() >= item.start && current() < item.end - 1);
@@ -222,6 +232,38 @@ export function Player(props: { request: PlaybackRequest }) {
     }
   }
 
+  async function prepare(index: number): Promise<ReadyEpisode | null> {
+    const target = props.request.episodes[index];
+    if (!target) return null;
+
+    const { studios } = await api.studios(target.handle);
+    if (studios.length === 0) return null;
+
+    const preferred =
+      studios.find((studio) => studio.title === studioTitle()) ?? studios[0]!;
+    const { videos } = await api.videos(preferred.handle);
+    if (videos.length === 0) return null;
+
+    return { index, dub: preferred.title, studios, videos };
+  }
+
+  createEffect(() => {
+    if (!hasNext() || prefetching || duration() <= 0) return;
+    if (remaining() > PREFETCH_LEAD_SEC || switchingTo() !== null) return;
+
+    const index = episodeIndex() + 1;
+    const stored = ready();
+    if (stored && stored.index === index && stored.dub === studioTitle()) return;
+
+    prefetching = true;
+    void prepare(index)
+      .then((found) => setReady(found))
+      .catch(() => setReady(null))
+      .finally(() => {
+        prefetching = false;
+      });
+  });
+
   async function switchEpisode(index: number) {
     const target = props.request.episodes[index];
     if (!target) return;
@@ -230,19 +272,22 @@ export function Player(props: { request: PlaybackRequest }) {
     setSwitchingTo(index);
     const previousQuality = activeVideo()?.quality;
     try {
-      const { studios } = await api.studios(target.handle);
-      if (studios.length === 0) {
+      const stored = ready();
+      const found =
+        stored && stored.index === index && stored.dub === studioTitle()
+          ? stored
+          : await prepare(index);
+
+      setReady(null);
+      if (!found) {
         pushToast("Для этой серии нет плееров", "error");
         return;
       }
 
+      const studios = found.studios;
       const preferred =
-        studios.find((studio) => studio.title === studioTitle()) ?? studios[0]!;
-      const { videos: nextVideos } = await api.videos(preferred.handle);
-      if (nextVideos.length === 0) {
-        pushToast("Озвучка не отдала видео", "error");
-        return;
-      }
+        studios.find((studio) => studio.title === found.dub) ?? studios[0]!;
+      const nextVideos = found.videos;
 
       setEpisodeIndex(index);
       setNextDismissed(false);
@@ -283,6 +328,7 @@ export function Player(props: { request: PlaybackRequest }) {
 
       setStudioTitle(studio.title);
       setVideos(nextVideos);
+      setReady(null);
 
       const nextIndex = keepQuality(nextVideos, previousQuality);
       setQualityIndex(nextIndex);
@@ -424,17 +470,7 @@ export function Player(props: { request: PlaybackRequest }) {
     closePlayer();
   }
 
-  onMount(async () => {
-    const storedVolume = await api.settingGet("player.volume");
-    if (storedVolume !== null) {
-      const parsed = Number(storedVolume);
-      if (Number.isFinite(parsed)) setVolumeValue(parsed);
-    }
-
-    await load(activeVideo()!, props.request.startAt);
-    revealControls();
-    void loadDubs();
-
+  onMount(() => {
     saveTimer = window.setInterval(() => {
       if (!video.paused) persist();
     }, PROGRESS_INTERVAL);
@@ -495,6 +531,18 @@ export function Player(props: { request: PlaybackRequest }) {
       for (const track of externalSubs()) URL.revokeObjectURL(track.url);
       hls?.destroy();
     });
+
+    void (async () => {
+      const storedVolume = await api.settingGet("player.volume").catch(() => null);
+      if (storedVolume !== null) {
+        const parsed = Number(storedVolume);
+        if (Number.isFinite(parsed)) setVolumeValue(parsed);
+      }
+
+      await load(activeVideo()!, props.request.startAt);
+      revealControls();
+      void loadDubs();
+    })();
   });
 
   createEffect(
