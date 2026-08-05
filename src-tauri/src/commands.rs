@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anilume_core::error::CoreErrorWire;
+use anilume_core::discover::{Comment, RelatedTitle, TitleDetail};
 use anilume_core::{
     ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
     LibraryEntry, WatchProgress,
@@ -120,6 +121,46 @@ pub async fn discover_search(
     query: DiscoverQuery,
 ) -> Answer<Vec<DiscoverCard>> {
     Ok(state.discover.search(&query).await?)
+}
+
+#[tauri::command]
+pub async fn discover_title(state: State<'_, AppState>, id: i64) -> Answer<TitleDetail> {
+    Ok(state.discover.title(id).await?)
+}
+
+#[tauri::command]
+pub async fn discover_similar(
+    state: State<'_, AppState>,
+    id: i64,
+    limit: Option<usize>,
+) -> Answer<Vec<DiscoverCard>> {
+    Ok(state.discover.similar(id, limit.unwrap_or(12)).await?)
+}
+
+#[tauri::command]
+pub async fn discover_related(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Answer<Vec<RelatedTitle>> {
+    Ok(state.discover.related(id).await?)
+}
+
+#[tauri::command]
+pub async fn discover_comments(
+    state: State<'_, AppState>,
+    topic_id: i64,
+    limit: Option<i64>,
+) -> Answer<Vec<Comment>> {
+    Ok(state.discover.comments(topic_id, limit.unwrap_or(20)).await?)
+}
+
+#[tauri::command]
+pub async fn discover_match(
+    state: State<'_, AppState>,
+    name: String,
+    year: Option<i64>,
+) -> Answer<Option<DiscoverCard>> {
+    Ok(state.discover.match_title(&name, year).await?)
 }
 
 #[derive(Serialize)]

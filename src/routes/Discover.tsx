@@ -11,6 +11,7 @@ import {
 } from "solid-js";
 
 import { PosterSkeleton } from "../components/PosterCard";
+import { ShikiCard } from "../components/ShikiCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { resolveCard } from "../lib/resolve";
@@ -39,23 +40,6 @@ const ORDERS: { value: string; label: string }[] = [
   { value: "name", label: "По названию" },
   { value: "random", label: "Случайно" },
 ];
-
-const KIND_LABELS: Record<string, string> = {
-  tv: "Сериал",
-  movie: "Фильм",
-  ova: "OVA",
-  ona: "ONA",
-  special: "Спешл",
-  tv_special: "TV-спешл",
-  music: "Клип",
-  pv: "PV",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  ongoing: "выходит",
-  released: "завершено",
-  anons: "анонс",
-};
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR + 1 - 1965 + 1 }, (_, i) => CURRENT_YEAR + 1 - i);
@@ -241,14 +225,6 @@ export function Discover() {
     if (from === null && to === null) return null;
     if (from !== null && to !== null) return from === to ? String(from) : `${from}–${to}`;
     return from !== null ? `от ${from}` : `до ${to}`;
-  };
-
-  const summary = (card: DiscoverCard) => {
-    const parts: string[] = [];
-    if (card.year) parts.push(String(card.year));
-    if (card.kind) parts.push(KIND_LABELS[card.kind] ?? card.kind);
-    if (card.episodes && card.episodes > 1) parts.push(`${card.episodes} эп.`);
-    return parts;
   };
 
   async function open(card: DiscoverCard) {
@@ -506,54 +482,11 @@ export function Discover() {
           <div class="poster-grid">
             <For each={items()}>
               {(card) => (
-                <button class="card" onClick={() => void open(card)}>
-                  <div class="card__art">
-                    <Show
-                      when={card.poster}
-                      fallback={<div class="skeleton" style={{ height: "100%" }} />}
-                    >
-                      <img
-                        src={card.poster!}
-                        alt={card.title}
-                        loading="lazy"
-                        decoding="async"
-                        data-loaded="true"
-                      />
-                    </Show>
-
-                    <div class="card__scrim" />
-                    <div class="card__play">
-                      <Show
-                        when={opening() !== card.id}
-                        fallback={<span class="spinner" />}
-                      >
-                        <Icon name="play" size={20} />
-                      </Show>
-                    </div>
-
-                    <Show when={card.status && card.status !== "released"}>
-                      <span class="badge badge--status">
-                        {STATUS_LABELS[card.status!] ?? card.status}
-                      </span>
-                    </Show>
-
-                    <Show when={card.score}>
-                      <span class="badge badge--score">
-                        <Icon name="star" size={11} />
-                        {card.score!.toFixed(1)}
-                      </span>
-                    </Show>
-                  </div>
-
-                  <div>
-                    <div class="card__title">{card.title}</div>
-                    <Show when={summary(card).length > 0}>
-                      <div class="card__meta">
-                        <For each={summary(card)}>{(part) => <span>{part}</span>}</For>
-                      </div>
-                    </Show>
-                  </div>
-                </button>
+                <ShikiCard
+                  card={card}
+                  busy={opening() === card.id}
+                  onOpen={(chosen) => void open(chosen)}
+                />
               )}
             </For>
           </div>

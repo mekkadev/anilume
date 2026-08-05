@@ -152,91 +152,6 @@
   color: var(--ink-3);
 }
 
-.hero {
-  position: relative;
-  margin: 0 -22px 24px;
-  padding: 20px 22px 22px;
-}
-
-.hero__glow {
-  display: none;
-}
-
-.hero__inner {
-  display: grid;
-  grid-template-columns: 164px 1fr;
-  gap: 26px;
-  align-items: start;
-}
-
-.hero__poster {
-  aspect-ratio: 2 / 3;
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  background: var(--fill);
-  box-shadow: var(--shadow-card);
-}
-
-.hero__poster img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.hero__body {
-  min-width: 0;
-  padding-top: 2px;
-}
-
-.hero__title {
-  font-family: var(--font-display);
-  font-size: 32px;
-  line-height: 1.1;
-  font-weight: 700;
-  letter-spacing: -0.024em;
-}
-
-.hero__alt {
-  margin-top: 5px;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-
-.hero__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin: 14px 0 10px;
-}
-
-.hero__genres {
-  color: var(--ink-2);
-  font-size: 12.5px;
-  margin-bottom: 12px;
-}
-
-.hero__description {
-  color: var(--ink-2);
-  line-height: 1.6;
-  font-size: 13.5px;
-  max-width: 66ch;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  user-select: text;
-}
-
-.hero__description[data-expanded="true"] {
-  -webkit-line-clamp: unset;
-}
-
-.hero__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 18px;
-}
-
 .episode-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
@@ -878,12 +793,6 @@
   transform: translateX(16px);
 }
 
-.hero__chips .chip--accent,
-.hero__chips .chip--warning {
-  color: var(--accent-text);
-  font-weight: 600;
-}
-
 .dub {
   box-shadow: var(--shadow-control);
   border-radius: var(--r-md);
@@ -948,13 +857,6 @@
 .panel__rowlabel {
   font-size: 13px;
   color: var(--ink-2);
-}
-
-.hero__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 12px;
 }
 
 .tag {
@@ -1077,4 +979,12 @@
 
 .menu__scroll--short {
   max-height: 158px;
+}
+
+.search-field {
+  margin-bottom: 22px;
+}
+
+.hero--empty {
+  min-height: 470px;
 }

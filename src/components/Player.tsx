@@ -27,6 +27,7 @@ async function loadHls() {
 const CONTROLS_TIMEOUT = 2600;
 const PROGRESS_INTERVAL = 5000;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const NEXT_LEAD_SEC = 15;
 const SUBTITLE_TYPES = ".vtt,.srt,.txt";
 
 export function Player(props: { request: PlaybackRequest }) {
@@ -64,6 +65,7 @@ export function Player(props: { request: PlaybackRequest }) {
   const [subtitleTrack, setSubtitleTrack] = createSignal(-1);
   const [switchingTo, setSwitchingTo] = createSignal<number | null>(null);
   const [skips, setSkips] = createSignal<{ kind: string; start: number; end: number }[]>([]);
+  const [nextDismissed, setNextDismissed] = createSignal(false);
 
   const activeSkip = () =>
     skips().find((item) => current() >= item.start && current() < item.end - 1);
@@ -89,6 +91,15 @@ export function Player(props: { request: PlaybackRequest }) {
   }
 
   const episode = () => props.request.episodes[episodeIndex()];
+  const remaining = () => Math.max(0, duration() - current());
+
+  const upNext = () => {
+    if (!props.request.autoplayNext || nextDismissed()) return null;
+    if (duration() <= 0 || switchingTo() !== null) return null;
+    if (remaining() > NEXT_LEAD_SEC || remaining() <= 0) return null;
+    return props.request.episodes[episodeIndex() + 1] ?? null;
+  };
+
   const activeVideo = () => videos()[qualityIndex()];
   const hasNext = () => episodeIndex() < props.request.episodes.length - 1;
   const hasPrevious = () => episodeIndex() > 0;
@@ -234,6 +245,7 @@ export function Player(props: { request: PlaybackRequest }) {
       }
 
       setEpisodeIndex(index);
+      setNextDismissed(false);
       setStudioTitle(preferred.title);
       setDubs(studios);
       setVideos(nextVideos);
@@ -561,6 +573,26 @@ export function Player(props: { request: PlaybackRequest }) {
         <div class="player__spinner">
           <span class="spinner spinner--lg" />
         </div>
+      </Show>
+
+      <Show when={upNext()}>
+        {(next) => (
+          <div class="next-up">
+            <div class="next-up__label">Следующая серия через {Math.ceil(remaining())}</div>
+            <div class="next-up__title">{next().title}</div>
+            <div class="next-up__actions">
+              <button
+                class="btn btn--primary"
+                onClick={() => void switchEpisode(episodeIndex() + 1)}
+              >
+                Смотреть сейчас
+              </button>
+              <button class="btn btn--plain" onClick={() => setNextDismissed(true)}>
+                Не надо
+              </button>
+            </div>
+          </div>
+        )}
       </Show>
 
       <Show when={activeSkip()}>

@@ -16,9 +16,12 @@ import type {
   LibraryEntry,
   ShikimoriAccount,
   ShikimoriConfig,
+  ShikiComment,
   ShikimoriStatus,
   SourceInfo,
   StudioInfo,
+  TitleDetail,
+  RelatedTitle,
   UserRate,
   VideoInfo,
   WatchProgress,
@@ -81,6 +84,19 @@ export const api = {
 
   discoverSearch: (query: DiscoverQuery) =>
     call<DiscoverCard[]>("discover_search", { query }),
+
+  discoverTitle: (id: number) => call<TitleDetail>("discover_title", { id }),
+
+  discoverSimilar: (id: number, limit = 12) =>
+    call<DiscoverCard[]>("discover_similar", { id, limit }),
+
+  discoverRelated: (id: number) => call<RelatedTitle[]>("discover_related", { id }),
+
+  discoverComments: (topicId: number, limit = 20) =>
+    call<ShikiComment[]>("discover_comments", { topicId, limit }),
+
+  discoverMatch: (name: string, year?: number) =>
+    call<DiscoverCard | null>("discover_match", { name, year }),
 
   studios: (handle: string) =>
     call<{ studios: StudioInfo[] }>("episode_studios", { handle }),
