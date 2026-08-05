@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -135,7 +136,8 @@ def main() -> int:
     print(f"{OUTPUT.relative_to(ROOT)} — {icon.width}×{icon.height}")
 
     if args.generate:
-        subprocess.run(["npx", "tauri", "icon", str(OUTPUT)], cwd=ROOT, check=True)
+        npx = "npx.cmd" if os.name == "nt" else "npx"
+        subprocess.run([npx, "tauri", "icon", str(OUTPUT)], cwd=ROOT, check=True)
     else:
         print("Дальше: npx tauri icon src-tauri/icons/source.png")
     return 0
