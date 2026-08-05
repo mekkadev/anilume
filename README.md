@@ -81,6 +81,11 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 [AniSkip](https://api.aniskip.com). Автопереход на следующую серию с обратным
 отсчётом за пятнадцать секунд до конца — и с кнопкой «не надо».
 
+Переход мгновенный: за 75 секунд до конца серии плеер уже подтянул плееры
+и ссылки следующей. Если выбранный источник вдруг не отдал серию, приложение
+само перебирает остальные найденные по убыванию качества и включает первый
+рабочий, сказав об этом одной строкой.
+
 Субтитры приходят из трёх мест: вшитые в HLS-поток, отданные источником
 отдельной дорожкой, и файл `.srt` или `.vtt`, который открываешь сам из меню
 дорожек. SRT конвертируется в VTT прямо в приложении. ASS не поддерживается,
@@ -97,6 +102,11 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 на практике это не мешало, но это честное ограничение, а не недоделка.
 
 ## каталог и поиск
+
+⌘K открывает палитру поверх всего: результаты приходят по мере ввода
+с задержкой в 300 мс, стрелки водят по списку, Enter открывает. Ищет
+по каталогу Shikimori, а если он недоступен — по активному источнику,
+и честно говорит, что переключилась.
 
 Поиск по названию умеет любой источник. Поиск по жанру, году, студии и статусу
 не умеет ни один: у API AnimeLib есть жанры, типы и диапазон лет, но нет
@@ -145,6 +155,19 @@ id Shikimori и MAL совпадают, так что промежуточног
 отдаёт старую вместо пустого экрана. Провайдер режет Shikimori, зеркала легли,
 интернета нет — вчерашние подборки и описания на месте. Размер кэша и кнопка
 очистки лежат в настройках.
+
+## расписание и новые серии
+
+Отдельный раздел показывает, когда выходят следующие серии: по дням, внутри
+дня — по времени эфира в вашем поясе. Сверху то, что есть в вашей библиотеке,
+и эти же карточки подсвечены в общем списке.
+
+Раз в час приложение сверяет расписание с библиотекой и присылает системное
+уведомление, когда выходит серия того, что вы смотрите, отложили или держите
+в планах. Выход определяется по росту счётчика следующей серии: было 10,
+стало 11 — десятая вышла. Первый проход после установки только запоминает
+состояние и молчит, иначе прилетел бы залп. Отключается тумблером
+в настройках.
 
 ## интерфейс
 
@@ -282,6 +305,12 @@ ffmpeg лежит в бандле, поэтому скачивание рабо�
 
 Файлы кладутся в `~/Videos/anilume/<тайтл>/<тайтл> - 03 серия [озвучка] [1080p].mp4`.
 
+Обрыв связи не убивает загрузку: три попытки с нарастающей паузой. Если
+приложение закрыли на середине, при следующем запуске такие загрузки помечаются
+прерванными, а не висят вечно в «идёт» — и рядом появляется кнопка «Скачать
+заново». Байтовой докачки нет: mp4 с `+faststart` пишет moov-атом в конец,
+дописать оборванный файл нельзя, только начать сначала.
+
 ## собрать самому
 
 ```bash
@@ -298,9 +327,9 @@ npm run app:build        # бандл
 
 ```bash
 pytest                          # 55 тестов сайдкара, без сети
-cargo test -p anilume-core      # 104 теста ядра, включая живой прокси
+cargo test -p anilume-core      # 113 тестов ядра, включая живой прокси
 npm run typecheck
-npm run test:ui                 # 9 сквозных тестов интерфейса в браузере
+npm run test:ui                 # 16 сквозных тестов интерфейса в браузере
 python scripts/design_lint.py   # правила оформления
 ```
 
@@ -426,6 +455,11 @@ fullscreen, opening and ending skipped where [aniskip](https://api.aniskip.com)
 knows the timings, and a next-episode countdown fifteen seconds out with a way
 to say no.
 
+the jump is instant: 75 seconds before the episode ends the player has already
+pulled the next one's players and links. if the chosen source will not serve an
+episode, the app walks the other candidates by quality and starts the first one
+that works, saying so in one line.
+
 subtitles come from three places: the ones baked into an hls stream, the ones a
 source hands over as a separate track, and a `.srt` or `.vtt` file you open
 yourself from the tracks menu. srt is converted to vtt in the app; ass is not
@@ -442,6 +476,11 @@ source serves mkv and downloads are remuxed to mp4, so this has not come up in
 practice, but it is a real limit rather than a missing feature.
 
 ## the catalogue
+
+⌘K opens a palette over everything: results arrive as you type after a 300ms
+pause, arrows walk the list, enter opens. it searches the shikimori catalogue,
+falling back to the active source when the catalogue is down — and it says when
+it did.
 
 search by name is what a source can do. search by genre, year, studio and status
 is what none of them can — the animelib api takes genres, types and a year range
@@ -620,6 +659,26 @@ wiring this up.
 
 files land in `~/Videos/anilume/<title>/<title> - 03 серия [dub] [1080p].mp4`.
 
+a dropped connection no longer kills a download: three attempts with a growing
+pause. if the app was closed mid-download, the next launch marks those as
+interrupted instead of leaving them stuck on "running" forever, with a redo
+button next to them. there is no byte-level resume: mp4 with `+faststart` puts
+the moov atom at the end, so a truncated file cannot be appended to, only
+restarted.
+
+## the schedule and new episodes
+
+a separate section shows when the next episodes air: by day, and within a day
+by air time in your timezone. what is already in your library comes first, and
+the same cards are highlighted in the full list.
+
+once an hour the app checks the schedule against your library and sends a
+system notification when an episode airs for something you are watching, put
+on hold, or planned. airing is detected by the next-episode counter going up:
+it was 10, now it is 11, so 10 is out. the first pass after install only
+records the state and stays quiet, otherwise you would get a barrage. there is
+a switch in settings.
+
 ## build it yourself
 
 ```bash
@@ -636,9 +695,9 @@ npm run app:build        # bundle
 
 ```bash
 pytest                          # 55, sidecar, no network
-cargo test -p anilume-core      # 104, includes a real proxy round-trip
+cargo test -p anilume-core      # 113, includes a real proxy round-trip
 npm run typecheck
-npm run test:ui                 # 9, the interface end to end in a browser
+npm run test:ui                 # 16, the interface end to end in a browser
 python scripts/design_lint.py
 ```
 
