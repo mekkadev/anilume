@@ -24,6 +24,19 @@
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
     "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", monospace;
+
+  --text-large-title: 26px;
+  --text-title1: 22px;
+  --text-title2: 17px;
+  --text-title3: 15px;
+  --text-body: 13px;
+  --text-callout: 12px;
+  --text-subhead: 11px;
+  --text-caption: 10px;
+
+  --control-h: 22px;
+  --control-h-lg: 28px;
+  --row-h: 28px;
 }
 
 :root {
@@ -58,6 +71,26 @@
   --shadow-sheet: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 24px 60px rgba(0, 0, 0, 0.26);
 }
 
+@supports (background: color-mix(in srgb, AccentColor 14%, transparent)) {
+  :root {
+    --accent: AccentColor;
+    --accent-hover: color-mix(in srgb, AccentColor 88%, black);
+    --accent-wash: color-mix(in srgb, AccentColor 14%, transparent);
+    --accent-text: color-mix(in srgb, AccentColor 92%, black);
+    --on-accent: AccentColorText;
+  }
+}
+
+@supports (background: color-mix(in srgb, -apple-system-control-accent 14%, transparent)) {
+  :root {
+    --accent: -apple-system-control-accent;
+    --accent-hover: color-mix(in srgb, -apple-system-control-accent 88%, black);
+    --accent-wash: color-mix(in srgb, -apple-system-control-accent 14%, transparent);
+    --accent-text: color-mix(in srgb, -apple-system-control-accent 92%, black);
+    --on-accent: #ffffff;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --accent: #0a84ff;
@@ -89,6 +122,26 @@
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.32);
     --shadow-popover: 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 12px 34px rgba(0, 0, 0, 0.55);
     --shadow-sheet: 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 26px 70px rgba(0, 0, 0, 0.7);
+  }
+
+  @supports (background: color-mix(in srgb, AccentColor 24%, transparent)) {
+    :root {
+      --accent: AccentColor;
+      --accent-hover: color-mix(in srgb, AccentColor 80%, white);
+      --accent-wash: color-mix(in srgb, AccentColor 24%, transparent);
+      --accent-text: color-mix(in srgb, AccentColor 75%, white);
+      --on-accent: AccentColorText;
+    }
+  }
+
+  @supports (background: color-mix(in srgb, -apple-system-control-accent 24%, transparent)) {
+    :root {
+      --accent: -apple-system-control-accent;
+      --accent-hover: color-mix(in srgb, -apple-system-control-accent 80%, white);
+      --accent-wash: color-mix(in srgb, -apple-system-control-accent 24%, transparent);
+      --accent-text: color-mix(in srgb, -apple-system-control-accent 75%, white);
+      --on-accent: #ffffff;
+    }
   }
 }
 
