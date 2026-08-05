@@ -143,7 +143,11 @@ Range-запросы проходят насквозь, потому что от
 ## источники
 
 Десять каталогов. Девять приходят из anicli-api, с AnimeLib приложение
-разговаривает напрямую. Выбор — круглая кнопка внизу рельса, и он запоминается.
+разговаривает напрямую. Выбирать источник заранее не нужно: открываешь аниме —
+приложение само ищет его во всех десяти сразу, замеряет, кто какое качество
+отдаёт, и включает лучший. Остальные стоят рядом строкой «где смотреть»
+с реальным разрешением и числом озвучек, переключение в один клик и
+запоминается для этого тайтла.
 
 | источник | чем интересен |
 | --- | --- |
@@ -154,7 +158,12 @@ Range-запросы проходят насквозь, потому что от
 | AnimeVost | прямой mp4, поэтому быстро качается |
 | AniLib, Sameband, Dreamcast, HDrezka | помельче или не только про аниме |
 
-Поиск по умолчанию идёт по одному источнику и по всем девяти по запросу,
+Замер — это не заявленный потолок, а фактический: сайдкар одним запросом
+проходит по всем найденным источникам параллельно, для каждого берёт первую
+серию, первую озвучку и максимальное качество, которое та реально отдаёт.
+Источник, который лёг или не отдал видео, так и подписан, а не выкинут молча.
+
+Поиск на странице поиска идёт по одному источнику и по всем девяти по запросу,
 параллельно. Упавший источник не роняет страницу — он возвращается отдельным
 списком, а гео-заблокированные так и говорят вместо общей ошибки.
 
@@ -229,7 +238,7 @@ npm run app:build        # бандл
 ```
 
 ```bash
-pytest                          # 51 тест сайдкара, без сети
+pytest                          # 55 тестов сайдкара, без сети
 cargo test -p anilume-core      # 78 тестов ядра, включая живой прокси
 npm run typecheck
 python scripts/design_lint.py   # правила оформления
@@ -248,6 +257,9 @@ Rust-ядро вынесено в отдельный крейт от Tauri-об�
   поэтому по умолчанию стоит AnimeLib.
 - **хендлы не переживают перезапуск.** Приложение перерешает тайтл поиском —
   это быстро, но на каталоге с почти-дубликатами может попасть не туда.
+- **замер качества стоит времени.** Опрос всех источников занимает несколько
+  секунд; страница показывает описание сразу, а строка «где смотреть»
+  дозаполняется по мере ответов.
 - **лента на главной — это не источник.** Четыре ряда из пяти описывают, что
   существует, по данным Shikimori, и только один — что реально может отдать
   выбранный источник. Ряд может предложить тайтл, которого в источнике нет,
@@ -263,7 +275,7 @@ Rust-ядро вынесено в отдельный крейт от Tauri-об�
 
 ## стек
 
-Rust, Tauri 2, SolidJS, Python, hls.js, SQLite, ffmpeg.
+Rust, Tauri 2, SolidJS, Python, hls.js, SQLite, ffmpeg, иконки [Lucide](https://lucide.dev).
 
 Solid, а не React, потому что каталог — это длинная лента картинок, и
 точечные обновления выигрывают у мемоизации дерева. hls.js грузится по
@@ -405,8 +417,11 @@ not video.
 
 ## sources
 
-ten catalogues. nine come from anicli-api; animelib is talked to directly. the
-picker is the round button at the bottom of the rail and the choice sticks.
+ten catalogues. nine come from anicli-api; animelib is talked to directly. you
+never pick a source up front: opening a title searches all ten at once, measures
+what quality each one actually serves, and selects the best. the rest sit next to
+it in a "where to watch" row with the real resolution and dub count, one click to
+switch, remembered per title.
 
 | source | note |
 | --- | --- |
@@ -417,10 +432,14 @@ picker is the round button at the bottom of the rail and the choice sticks.
 | animevost | direct mp4, so downloads are fast |
 | anilib, sameband, dreamcast, hdrezka | smaller, or not anime-only |
 
-search runs against one source by default and against all nine on request,
-concurrently. a source that fails does not take the page down with it — it comes
-back in a separate list, and geo-blocked ones say so instead of showing a
-generic error.
+the measurement is not a declared ceiling but the real one: in a single call the
+sidecar walks every source that has the title, in parallel, taking the first
+episode, the first dub and the highest quality it actually returns. a source that
+died or served nothing is labelled as such rather than silently dropped.
+
+the search page runs against one source by default and against all nine on
+request, concurrently. a source that fails does not take the page down with it —
+it comes back in a separate list, and geo-blocked ones say so.
 
 anicli-api objects are a stateful chain: episodes come off a live `Anime` object,
 which comes off a live `Search` object, and none of it is addressable by id. so
@@ -486,7 +505,7 @@ npm run app:build        # bundle
 ```
 
 ```bash
-pytest                          # 51, sidecar, no network
+pytest                          # 55, sidecar, no network
 cargo test -p anilume-core      # 78, includes a real proxy round-trip
 npm run typecheck
 python scripts/design_lint.py
@@ -519,7 +538,7 @@ anywhere including a bare ci container.
 
 ## stack
 
-rust, tauri 2, solidjs, python, hls.js, sqlite, ffmpeg.
+rust, tauri 2, solidjs, python, hls.js, sqlite, ffmpeg, [lucide](https://lucide.dev) icons.
 
 solid rather than react because the catalogue is a long scroll of images and
 fine-grained updates beat memoising a tree into behaving. hls.js loads on demand

@@ -19,6 +19,7 @@ import type {
   ShikiComment,
   ShikimoriStatus,
   SourceInfo,
+  SourceProbe,
   StudioInfo,
   TitleDetail,
   RelatedTitle,
@@ -67,6 +68,9 @@ export const api = {
       groups: { source: string; items: AnimeCard[] }[];
       failures: { source: string; error: { message: string } }[];
     }>("catalog_search_multi", { sources, query }),
+
+  catalogProbe: (items: { handle: string }[]) =>
+    call<{ probes: SourceProbe[] }>("catalog_probe", { items }),
 
   anime: (handle: string) => call<AnimeDetail>("anime_get", { handle }),
 

@@ -3,7 +3,6 @@ import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { formatTime, plural, relativeTime } from "../lib/format";
-import { resolveCard } from "../lib/resolve";
 import { navigate, pushToast, reportError, sourceName } from "../lib/store";
 import type { WatchProgress } from "../lib/types";
 
@@ -45,8 +44,11 @@ export function History() {
   const open = async (item: WatchProgress) => {
     setOpening(`${item.animeKey}:${item.episodeOrdinal}`);
     try {
-      const card = await resolveCard(item.source, item.animeKey, item.animeTitle);
-      navigate({ name: "title", card });
+      navigate({
+        name: "title",
+        query: item.animeTitle,
+        source: item.source,
+      });
     } catch (error) {
       reportError(error);
     } finally {

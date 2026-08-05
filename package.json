@@ -20,10 +20,11 @@
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.5",
     "@tauri-apps/plugin-os": "^2.2.0",
-    "hls.js": "^1.5.20",
-    "solid-js": "^1.9.3",
+    "@tauri-apps/plugin-process": "^2.2.0",
     "@tauri-apps/plugin-updater": "^2.3.0",
-    "@tauri-apps/plugin-process": "^2.2.0"
+    "hls.js": "^1.5.20",
+    "lucide-solid": "^1.28.0",
+    "solid-js": "^1.9.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",

@@ -115,6 +115,7 @@ async def test_dispatch_table_covers_documented_methods(service):
         "catalog.ongoing",
         "catalog.search",
         "catalog.searchMulti",
+        "catalog.probe",
         "anime.get",
         "anime.episodes",
         "episode.studios",
@@ -140,4 +141,48 @@ async def test_config_set_merges_and_resets_extractor(service, wire):
 async def test_config_set_requires_object(service):
     with pytest.raises(RpcError) as exc:
         await service.config_set({"section": "animelib", "values": "не объект"})
+    assert exc.value.code == INVALID_PARAMS
+
+async def test_probe_reports_quality_and_dubs_per_source(service, wire):
+    wire("anilibria", build_catalog())
+    cards = (await service.catalog_search({"source": "anilibria", "query": "атака"}))["items"]
+
+    result = await service.catalog_probe({"items": [{"handle": cards[0]["handle"]}]})
+    probe = result["probes"][0]
+
+    assert probe["source"] == "anilibria"
+    assert probe["quality"] == 1080
+    assert probe["dubs"] == 2
+    assert probe["episodes"] == 3
+    assert probe["error"] is None
+
+async def test_probe_reports_a_failing_source_instead_of_raising(service, wire):
+    wire("anilibria", FakeExtractor(cards=[FakeCard("Атака титанов", "https://site/a/1")]))
+    cards = (await service.catalog_search({"source": "anilibria", "query": "атака"}))["items"]
+
+    result = await service.catalog_probe({"items": [{"handle": cards[0]["handle"]}]})
+    probe = result["probes"][0]
+
+    assert probe["quality"] is None
+    assert probe["dubs"] == 0
+    assert probe["error"]
+
+async def test_probe_runs_every_source_even_when_one_dies(service, wire):
+    wire("anilibria", build_catalog())
+    wire("animego", FakeExtractor(cards=[FakeCard("Атака титанов", "https://ag/1")]))
+
+    alive = (await service.catalog_search({"source": "anilibria", "query": "атака"}))["items"]
+    dead = (await service.catalog_search({"source": "animego", "query": "атака"}))["items"]
+
+    result = await service.catalog_probe(
+        {"items": [{"handle": dead[0]["handle"]}, {"handle": alive[0]["handle"]}]}
+    )
+
+    by_source = {p["source"]: p for p in result["probes"]}
+    assert by_source["animego"]["quality"] is None
+    assert by_source["anilibria"]["quality"] == 1080
+
+async def test_probe_requires_a_list(service):
+    with pytest.raises(RpcError) as exc:
+        await service.catalog_probe({"items": "нет"})
     assert exc.value.code == INVALID_PARAMS

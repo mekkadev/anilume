@@ -27,19 +27,19 @@ import {
   setQualityPref,
   setRememberDub,
 } from "../lib/prefs";
-import { resolveCard } from "../lib/resolve";
 import {
-  activeSource,
   navigate,
   openPlayer,
   pushToast,
   reportError,
   setAmbient,
   sourceName,
+  sources,
 } from "../lib/store";
 import type {
   AnimeCard,
   DiscoverCard,
+  SourceProbe,
   VideoInfo,
   AnimeDetail,
   EpisodeInfo,
@@ -61,19 +61,122 @@ function studioSettingKey(source: string, animeKey: string) {
   return `studio:${source}:${animeKey}`;
 }
 
-export function Title(props: { card: AnimeCard }) {
+function sourceSettingKey(query: string) {
+  return `source:${query.trim().toLowerCase()}`;
+}
+
+function pickBest(items: AnimeCard[], query: string) {
+  const needle = query.trim().toLowerCase();
+  return (
+    items.find((item) => item.title.trim().toLowerCase() === needle) ??
+    items.find((item) => item.title.toLowerCase().includes(needle)) ??
+    items[0] ??
+    null
+  );
+}
+
+export function Title(props: { query: string; card?: AnimeCard; source?: string }) {
+  const [chosen, setChosen] = createSignal<string | null>(null);
+  const [probes, setProbes] = createSignal<Record<string, SourceProbe>>({});
+  const [probing, setProbing] = createSignal(false);
+
+  const [candidates] = createResource(
+    () => props.query,
+    async (query) => {
+      const keys = sources().map((item) => item.key);
+      const result = await api.searchMulti(keys, query);
+
+      const found: Record<string, AnimeCard> = {};
+      for (const group of result.groups) {
+        const best = pickBest(group.items, query);
+        if (best) found[group.source] = best;
+      }
+      if (props.card) found[source()] = props.card;
+      return found;
+    },
+  );
+
+  const available = () => {
+    const order = new Map(sources().map((item) => [item.key, item.priority ?? 50]));
+    return Object.values(candidates() ?? {}).sort((a, b) => {
+      const qa = probes()[a.source]?.quality ?? 0;
+      const qb = probes()[b.source]?.quality ?? 0;
+      if (qa !== qb) return qb - qa;
+      return (order.get(a.source) ?? 50) - (order.get(b.source) ?? 50);
+    });
+  };
+
+  createEffect(() => {
+    const found = candidates();
+    if (!found || Object.keys(found).length === 0) return;
+
+    void (async () => {
+      setProbing(true);
+      try {
+        const { probes: measured } = await api.catalogProbe(
+          Object.values(found).map((card) => ({ handle: card.handle })),
+        );
+        const table: Record<string, SourceProbe> = {};
+        for (const probe of measured) table[probe.source] = probe;
+        setProbes(table);
+      } catch {
+        setProbes({});
+      } finally {
+        setProbing(false);
+      }
+    })();
+  });
+
+  createEffect(() => {
+    const found = candidates();
+    if (!found || chosen()) return;
+
+    void (async () => {
+      const remembered = await api
+        .settingGet(sourceSettingKey(props.query))
+        .catch(() => null);
+
+      const preferred =
+        (remembered && found[remembered] ? remembered : null) ??
+        (props.card ? source() : null) ??
+        (props.source && found[props.source] ? props.source : null);
+
+      setChosen(preferred ?? available()[0]?.source ?? null);
+    })();
+  });
+
+  createEffect(() => {
+    if (probing() || !chosen() || Object.keys(probes()).length === 0) return;
+    const best = available()[0];
+    if (!best || best.source === chosen()) return;
+    if ((probes()[best.source]?.quality ?? 0) <= (probes()[chosen()!]?.quality ?? 0)) return;
+    setChosen(best.source);
+  });
+
+  const active = () => {
+    const key = chosen();
+    return key ? (candidates()?.[key] ?? null) : null;
+  };
+  const source = () => active()?.source ?? "";
+  const animeKey = () => active()?.key ?? "";
+
+  const chooseSource = (key: string) => {
+    setChosen(key);
+    void api.settingSet(sourceSettingKey(props.query), key).catch(() => undefined);
+  };
+
   const [detail] = createResource(
-    () => props.card.handle,
+    () => active()?.handle ?? null,
     (handle) => api.anime(handle),
   );
 
   const [progress, { refetch: refetchProgress }] = createResource(
-    () => [props.card.source, props.card.key] as const,
+    () => [source(), animeKey()] as const,
     ([source, key]) => api.animeProgress(source, key),
   );
 
   const [libraryEntry, { refetch: refetchLibrary }] = createResource(
-    () => [props.card.source, props.card.key] as const,
+    () => [source(), animeKey()] as const,
     ([source, key]) => api.libraryGet(source, key),
   );
 
@@ -107,25 +210,8 @@ export function Title(props: { card: AnimeCard }) {
   createEffect(() => setAmbient(shiki()?.art[0] ?? detail()?.poster ?? null));
   onCleanup(() => setAmbient(null));
 
-  const [opening, setOpening] = createSignal<number | null>(null);
-
-  const openShiki = async (card: DiscoverCard) => {
-    setOpening(card.id);
-    try {
-      navigate({
-        name: "title",
-        card: await resolveCard(activeSource(), "", card.title),
-      });
-    } catch {
-      pushToast(
-        `«${card.title}» не нашлось в источнике ${sourceName(activeSource())}`,
-        "error",
-        "Выберите другой источник внизу боковой панели",
-      );
-    } finally {
-      setOpening(null);
-    }
-  };
+  const openShiki = (card: DiscoverCard) =>
+    navigate({ name: "title", query: card.title });
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [busyEpisode, setBusyEpisode] = createSignal<number | null>(null);
@@ -168,7 +254,7 @@ export function Title(props: { card: AnimeCard }) {
 
     void (async () => {
       const remembered = rememberDub()
-        ? await api.settingGet(studioSettingKey(props.card.source, props.card.key))
+        ? await api.settingGet(studioSettingKey(source(), animeKey()))
         : null;
       const match = available.find((item) => item.title === remembered);
       setSelectedDub((match ?? available[0]!).title);
@@ -179,7 +265,7 @@ export function Title(props: { card: AnimeCard }) {
     setSelectedDub(studio.title);
     if (rememberDub()) {
       void api.settingSet(
-        studioSettingKey(props.card.source, props.card.key),
+        studioSettingKey(source(), animeKey()),
         studio.title,
       );
     }
@@ -201,7 +287,7 @@ export function Title(props: { card: AnimeCard }) {
     setBusyEpisode(episode.ordinal);
     try {
       const downloaded = await api
-        .downloadsFindCompleted(props.card.source, props.card.key, episode.ordinal)
+        .downloadsFindCompleted(source(), animeKey(), episode.ordinal)
         .catch(() => null);
 
       let studioTitle: string | null = null;
@@ -238,8 +324,8 @@ export function Title(props: { card: AnimeCard }) {
           : 0;
 
       openPlayer({
-        source: props.card.source,
-        animeKey: props.card.key,
+        source: source(),
+        animeKey: animeKey(),
         animeTitle: info.title,
         poster: info.poster,
         episodes: info.episodes,
@@ -282,8 +368,8 @@ export function Title(props: { card: AnimeCard }) {
       }
 
       await api.downloadsEnqueue({
-        source: props.card.source,
-        animeKey: props.card.key,
+        source: source(),
+        animeKey: animeKey(),
         animeTitle: info.title,
         poster: info.poster,
         episodeOrdinal: episode.ordinal,
@@ -343,8 +429,8 @@ export function Title(props: { card: AnimeCard }) {
         }
 
         await api.downloadsEnqueue({
-          source: props.card.source,
-          animeKey: props.card.key,
+          source: source(),
+          animeKey: animeKey(),
           animeTitle: info.title,
           poster: info.poster,
           episodeOrdinal: episode.ordinal,
@@ -379,8 +465,8 @@ export function Title(props: { card: AnimeCard }) {
     if (!info) return;
 
     const entry: LibraryEntry = {
-      source: props.card.source,
-      animeKey: props.card.key,
+      source: source(),
+      animeKey: animeKey(),
       title: info.title,
       poster: info.poster,
       status,
@@ -401,7 +487,7 @@ export function Title(props: { card: AnimeCard }) {
 
   const removeFromLibrary = async () => {
     try {
-      await api.libraryRemove(props.card.source, props.card.key);
+      await api.libraryRemove(source(), animeKey());
       await refetchLibrary();
       pushToast("Убрано из библиотеки");
     } catch (error) {
@@ -499,10 +585,6 @@ export function Title(props: { card: AnimeCard }) {
                           <div class="fact__value">{info().meta.status}</div>
                         </div>
                       </Show>
-                      <div>
-                        <div class="fact__label">Источник</div>
-                        <div class="fact__value">{sourceName(props.card.source)}</div>
-                      </div>
                     </div>
                   </div>
 
@@ -529,6 +611,55 @@ export function Title(props: { card: AnimeCard }) {
                       </button>
                     </div>
                   </Show>
+
+                  <div class="picker">
+                    <div class="picker__head">
+                      <span class="fact__label">Где смотреть</span>
+                      <Show when={probing()}>
+                        <span class="picker__probing">
+                          <span class="spinner" />
+                          проверяем качество
+                        </span>
+                      </Show>
+                    </div>
+
+                    <div class="picker__row">
+                      <For each={available()}>
+                        {(candidate) => {
+                          const probe = () => probes()[candidate.source];
+                          return (
+                            <button
+                              class="picker__item"
+                              data-active={candidate.source === chosen()}
+                              onClick={() => chooseSource(candidate.source)}
+                            >
+                              <span class="picker__name">
+                                {sourceName(candidate.source)}
+                              </span>
+                              <Show
+                                when={probe()?.quality}
+                                fallback={
+                                  <Show when={probe()?.error}>
+                                    <span class="picker__meta">не отдаёт видео</span>
+                                  </Show>
+                                }
+                              >
+                                <span class="picker__quality">
+                                  {qualityLabel(probe()!.quality!)}
+                                </span>
+                                <Show when={probe()!.dubs > 1}>
+                                  <span class="picker__meta">
+                                    {probe()!.dubs}{" "}
+                                    {plural(probe()!.dubs, "озвучка", "озвучки", "озвучек")}
+                                  </span>
+                                </Show>
+                              </Show>
+                            </button>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </div>
 
                   <div class="title-info__row">
                     <Show when={nextEpisode()}>
@@ -718,8 +849,7 @@ export function Title(props: { card: AnimeCard }) {
                     {(entry) => (
                       <button
                         class="season-card"
-                        disabled={opening() === entry.card.id}
-                        onClick={() => void openShiki(entry.card)}
+                        onClick={() => openShiki(entry.card)}
                       >
                         <div class="season-card__art">
                           <Show when={entry.card.poster}>
@@ -749,11 +879,7 @@ export function Title(props: { card: AnimeCard }) {
                 <div class="row__track">
                   <For each={similar()}>
                     {(card) => (
-                      <ShikiCard
-                        card={card}
-                        busy={opening() === card.id}
-                        onOpen={(chosen) => void openShiki(chosen)}
-                      />
+                      <ShikiCard card={card} onOpen={openShiki} />
                     )}
                   </For>
                 </div>

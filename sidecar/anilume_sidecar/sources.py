@@ -13,6 +13,7 @@ class SourceInfo:
     name: str
     description: str
     geo_restricted: bool = False
+    priority: int = 50
 
     notes: tuple[str, ...] = field(default_factory=tuple)
 
@@ -22,12 +23,14 @@ class SourceInfo:
             "name": self.name,
             "description": self.description,
             "geoRestricted": self.geo_restricted,
+            "priority": self.priority,
             "notes": list(self.notes),
         }
 
 SOURCES: tuple[SourceInfo, ...] = (
     SourceInfo(
         key="animego",
+        priority=30,
         module="anicli_api.source.animego",
         name="AnimeGO",
         description="Крупнейший каталог с множеством озвучек, плееры Kodik и Aniboom",
@@ -36,6 +39,7 @@ SOURCES: tuple[SourceInfo, ...] = (
     ),
     SourceInfo(
         key="animelib",
+        priority=10,
         module="anilume_sidecar.animelib",
         name="AnimeLib",
         description="Каталог с десятком озвучек на серию, свой плеер до 4K и постеры в полном размере",
@@ -43,6 +47,7 @@ SOURCES: tuple[SourceInfo, ...] = (
     ),
     SourceInfo(
         key="anilibria",
+        priority=20,
         module="anicli_api.source.anilibria",
         name="AniLibria",
         description="Собственная озвучка студии, официальный REST API, стабильные ссылки",
@@ -50,6 +55,7 @@ SOURCES: tuple[SourceInfo, ...] = (
     ),
     SourceInfo(
         key="yummy_anime",
+        priority=40,
         module="anicli_api.source.yummy_anime",
         name="Yummy Anime",
         description="Богатые метаданные и связка с Shikimori по remote_ids",
@@ -57,12 +63,14 @@ SOURCES: tuple[SourceInfo, ...] = (
     ),
     SourceInfo(
         key="yummy_anime_org",
+        priority=70,
         module="anicli_api.source.yummy_anime_org",
         name="Yummy Anime (зеркало)",
         description="Альтернативный домен Yummy Anime на случай блокировки основного",
     ),
     SourceInfo(
         key="animevost",
+        priority=80,
         module="anicli_api.source.animevost",
         name="AnimeVost",
         description="Классический каталог с собственной озвучкой и прямыми mp4",
@@ -70,24 +78,28 @@ SOURCES: tuple[SourceInfo, ...] = (
     ),
     SourceInfo(
         key="anilibme",
+        priority=50,
         module="anicli_api.source.anilibme",
         name="AniLib",
         description="Каталог AniLib с большим выбором озвучек и субтитров",
     ),
     SourceInfo(
         key="sameband",
+        priority=60,
         module="anicli_api.source.sameband",
         name="Sameband",
         description="Студия авторской озвучки, небольшой каталог",
     ),
     SourceInfo(
         key="dreamcast",
+        priority=60,
         module="anicli_api.source.dreamcast",
         name="Dreamcast",
         description="Студия Dreamerscast, собственная озвучка",
     ),
     SourceInfo(
         key="hdrezka",
+        priority=90,
         module="anicli_api.source.hdrezka",
         name="HDRezka",
         description="Не только аниме: пригодится для полнометражек и дорам",

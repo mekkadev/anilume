@@ -70,6 +70,14 @@ pub async fn catalog_search_multi(
 }
 
 #[tauri::command]
+pub async fn catalog_probe(state: State<'_, AppState>, items: Value) -> Answer<Value> {
+    Ok(state
+        .sidecar
+        .call("catalog.probe", json!({ "items": items }))
+        .await?)
+}
+
+#[tauri::command]
 pub async fn source_config_set(
     state: State<'_, AppState>,
     section: String,

@@ -153,7 +153,13 @@ export function App() {
                 <Discover />
               </Match>
               <Match when={matchRoute(route(), "title")}>
-                {(current) => <Title card={current().card} />}
+                {(current) => (
+                  <Title
+                    query={current().query}
+                    card={current().card}
+                    source={current().source}
+                  />
+                )}
               </Match>
               <Match when={matchRoute(route(), "library")}>
                 <Library />

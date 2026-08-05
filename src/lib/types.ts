@@ -3,7 +3,17 @@ export interface SourceInfo {
   name: string;
   description: string;
   geoRestricted: boolean;
+  priority: number;
   notes: string[];
+}
+
+export interface SourceProbe {
+  source: string;
+  handle: string;
+  quality: number | null;
+  dubs: number;
+  episodes: number;
+  error: string | null;
 }
 
 export interface AnimeMeta {

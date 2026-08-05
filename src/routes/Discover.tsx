@@ -14,8 +14,7 @@ import { PosterSkeleton } from "../components/PosterCard";
 import { ShikiCard } from "../components/ShikiCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
-import { resolveCard } from "../lib/resolve";
-import { activeSource, navigate, pushToast, reportError, sourceName } from "../lib/store";
+import { navigate, reportError } from "../lib/store";
 import type { DiscoverCard, DiscoverNamed, DiscoverOptions } from "../lib/types";
 
 const KINDS: { value: string; label: string }[] = [
@@ -141,7 +140,6 @@ export function Discover() {
   const [loading, setLoading] = createSignal(true);
   const [appending, setAppending] = createSignal(false);
   const [exhausted, setExhausted] = createSignal(false);
-  const [opening, setOpening] = createSignal<number | null>(null);
 
   let page = 1;
 
@@ -227,26 +225,8 @@ export function Discover() {
     return from !== null ? `от ${from}` : `до ${to}`;
   };
 
-  async function open(card: DiscoverCard) {
-    setOpening(card.id);
-    try {
-      const found = await resolveCard(activeSource(), "", card.title);
-      navigate({ name: "title", card: found });
-    } catch {
-      try {
-        const found = await resolveCard(activeSource(), "", card.originalTitle);
-        navigate({ name: "title", card: found });
-      } catch {
-        pushToast(
-          `«${card.title}» не нашлось в источнике ${sourceName(activeSource())}`,
-          "error",
-          "Выберите другой источник в боковой панели и попробуйте снова",
-        );
-      }
-    } finally {
-      setOpening(null);
-    }
-  }
+  const open = (card: DiscoverCard) =>
+    navigate({ name: "title", query: card.title });
 
   return (
     <div class="fade-in">
@@ -254,7 +234,7 @@ export function Discover() {
         <div>
           <h1 class="page-title">Каталог</h1>
           <p class="page-sub">
-            Подбор по базе Shikimori, просмотр — через {sourceName(activeSource())}
+            Подбор по базе Shikimori — источник выбирается на самом аниме
           </p>
         </div>
       </div>
@@ -482,11 +462,7 @@ export function Discover() {
           <div class="poster-grid">
             <For each={items()}>
               {(card) => (
-                <ShikiCard
-                  card={card}
-                  busy={opening() === card.id}
-                  onOpen={(chosen) => void open(chosen)}
-                />
+                <ShikiCard card={card} onOpen={open} />
               )}
             </For>
           </div>

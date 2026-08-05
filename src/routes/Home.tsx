@@ -14,15 +14,7 @@ import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { KIND_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { api } from "../lib/api";
 import { formatTime, relativeTime } from "../lib/format";
-import { resolveCard } from "../lib/resolve";
-import {
-  activeSource,
-  navigate,
-  pushToast,
-  reportError,
-  setAmbient,
-  sourceName,
-} from "../lib/store";
+import { activeSource, navigate, setAmbient, sourceName } from "../lib/store";
 import type { AnimeCard, ContinueItem, DiscoverCard } from "../lib/types";
 
 const HERO_COUNT = 5;
@@ -53,8 +45,6 @@ export function Home() {
     },
   );
 
-  const [opening, setOpening] = createSignal<number | null>(null);
-  const [resuming, setResuming] = createSignal<string | null>(null);
 
   const heroes = () => (popular() ?? []).slice(0, HERO_COUNT);
   const [heroIndex, setHeroIndex] = createSignal(0);
@@ -106,43 +96,14 @@ export function Home() {
 
   onCleanup(() => setAmbient(null));
 
-  const openCard = (card: AnimeCard) => navigate({ name: "title", card });
+  const openCard = (card: AnimeCard) =>
+    navigate({ name: "title", query: card.title, card });
 
-  const openShiki = async (card: DiscoverCard) => {
-    setOpening(card.id);
-    try {
-      navigate({
-        name: "title",
-        card: await resolveCard(activeSource(), "", card.title),
-      });
-    } catch {
-      try {
-        navigate({
-          name: "title",
-          card: await resolveCard(activeSource(), "", card.originalTitle),
-        });
-      } catch {
-        pushToast(
-          `«${card.title}» не нашлось в источнике ${sourceName(activeSource())}`,
-          "error",
-          "Выберите другой источник внизу боковой панели",
-        );
-      }
-    } finally {
-      setOpening(null);
-    }
-  };
+  const openShiki = (card: DiscoverCard) =>
+    navigate({ name: "title", query: card.title });
 
-  const openContinue = async (item: ContinueItem) => {
-    setResuming(item.animeKey);
-    try {
-      openCard(await resolveCard(item.source, item.animeKey, item.animeTitle));
-    } catch (error) {
-      reportError(error);
-    } finally {
-      setResuming(null);
-    }
-  };
+  const openContinue = (item: ContinueItem) =>
+    navigate({ name: "title", query: item.animeTitle, source: item.source });
 
   return (
     <div class="fade-in">
@@ -205,8 +166,7 @@ export function Home() {
 
                 <button
                   class="btn btn--primary btn--lg"
-                  disabled={opening() === current().id}
-                  onClick={() => void openShiki(current())}
+                  onClick={() => openShiki(current())}
                 >
                   <Icon name="play" size={14} />
                   Смотреть
@@ -222,11 +182,7 @@ export function Home() {
           <div class="row__track row__track--wide">
             <For each={continueList()}>
               {(item) => (
-                <ResumeCard
-                  item={item}
-                  busy={resuming() === item.animeKey}
-                  onOpen={() => void openContinue(item)}
-                />
+                <ResumeCard item={item} onOpen={() => openContinue(item)} />
               )}
             </For>
           </div>
@@ -237,7 +193,6 @@ export function Home() {
         title="Популярное"
         items={popular()}
         loading={popular.loading}
-        opening={opening()}
         onOpen={openShiki}
       />
 
@@ -245,7 +200,6 @@ export function Home() {
         title="Новинки"
         items={fresh()}
         loading={fresh.loading}
-        opening={opening()}
         onOpen={openShiki}
       />
 
@@ -259,7 +213,7 @@ export function Home() {
             fallback={
               <div class="empty">
                 <div class="empty__title">Источник не ответил</div>
-                <p>Выберите другой внизу боковой панели</p>
+                <p>Выберите другой источник внизу рельса</p>
                 <button class="btn btn--primary" onClick={() => void refetchOngoing()}>
                   Повторить
                 </button>
@@ -279,7 +233,6 @@ export function Home() {
         title="Лучшее"
         items={best()}
         loading={best.loading}
-        opening={opening()}
         onOpen={openShiki}
       />
 
@@ -290,8 +243,7 @@ export function Home() {
             hint={`похоже на «${found().anchor.title}»`}
             items={found().items}
             loading={false}
-            opening={opening()}
-            onOpen={openShiki}
+                onOpen={openShiki}
           />
         )}
       </Show>
@@ -348,7 +300,6 @@ function ShikiRow(props: {
   hint?: string;
   items: DiscoverCard[] | undefined;
   loading: boolean;
-  opening: number | null;
   onOpen: (card: DiscoverCard) => void;
 }) {
   return (
@@ -357,13 +308,7 @@ function ShikiRow(props: {
         <Show when={!props.loading} fallback={<SkeletonTrack />}>
           <div class="row__track">
             <For each={props.items}>
-              {(card) => (
-                <ShikiCard
-                  card={card}
-                  busy={props.opening === card.id}
-                  onOpen={props.onOpen}
-                />
-              )}
+              {(card) => <ShikiCard card={card} onOpen={props.onOpen} />}
             </For>
           </div>
         </Show>
@@ -372,11 +317,7 @@ function ShikiRow(props: {
   );
 }
 
-function ResumeCard(props: {
-  item: ContinueItem;
-  busy: boolean;
-  onOpen: () => void;
-}) {
+function ResumeCard(props: { item: ContinueItem; onOpen: () => void }) {
   const percent = () =>
     props.item.durationSec > 0
       ? Math.min((props.item.positionSec / props.item.durationSec) * 100, 100)
@@ -388,14 +329,14 @@ function ResumeCard(props: {
       : `Серия ${props.item.episodeOrdinal} · ${formatTime(props.item.positionSec)}`;
 
   return (
-    <button class="resume" onClick={props.onOpen} disabled={props.busy}>
+    <button class="resume" onClick={props.onOpen}>
       <div class="resume__art">
         <Show when={props.item.poster}>
           <img src={props.item.poster!} alt="" loading="lazy" decoding="async" />
         </Show>
         <div class="resume__shade" />
         <div class="resume__play">
-          <Icon name={props.busy ? "clock" : "play"} size={18} />
+          <Icon name="play" size={18} />
         </div>
       </div>
 

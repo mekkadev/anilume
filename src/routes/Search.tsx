@@ -40,7 +40,8 @@ export function Search(props: { query: string }) {
   const total = () =>
     (results()?.groups ?? []).reduce((sum, group) => sum + group.items.length, 0);
 
-  const openCard = (card: AnimeCard) => navigate({ name: "title", card });
+  const openCard = (card: AnimeCard) =>
+    navigate({ name: "title", query: card.title, card });
 
   return (
     <div class="fade-in">

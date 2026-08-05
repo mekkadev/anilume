@@ -3,7 +3,6 @@ import { For, Show, createResource, createSignal } from "solid-js";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { relativeTime } from "../lib/format";
-import { resolveCard } from "../lib/resolve";
 import { navigate, reportError, sourceName } from "../lib/store";
 import type { LibraryEntry, LibraryStatus } from "../lib/types";
 
@@ -27,8 +26,7 @@ export function Library() {
   const open = async (entry: LibraryEntry) => {
     setOpening(entry.animeKey);
     try {
-      const card = await resolveCard(entry.source, entry.animeKey, entry.title);
-      navigate({ name: "title", card });
+      navigate({ name: "title", query: entry.title, source: entry.source });
     } catch (error) {
       reportError(error);
     } finally {

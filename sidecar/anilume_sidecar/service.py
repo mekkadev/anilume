@@ -122,6 +122,72 @@ class AnilumeService:
                 groups.append({"source": source_key, "items": outcome})
         return {"query": query, "groups": groups, "failures": failures}
 
+    async def catalog_probe(self, params: dict[str, Any]) -> dict[str, Any]:
+        requested = params.get("items")
+        if not isinstance(requested, list):
+            raise RpcError(INVALID_PARAMS, "Параметр «items» должен быть списком")
+
+        async def probe(entry: Any) -> dict[str, Any]:
+            if not isinstance(entry, dict):
+                raise RpcError(INVALID_PARAMS, "Каждый элемент должен быть объектом")
+
+            handle = str(_require(entry, "handle"))
+            record = self.handles.get(handle)
+            source_key = record.source_key
+            result: dict[str, Any] = {
+                "source": source_key,
+                "handle": handle,
+                "quality": None,
+                "dubs": 0,
+                "episodes": 0,
+                "error": None,
+            }
+
+            try:
+                anime = await _call(source_key, "anime", record.obj.a_get_anime())
+                episodes = await _call(source_key, "episodes", anime.a_get_episodes())
+                result["episodes"] = len(episodes)
+                if not episodes:
+                    return result
+
+                studios = await _call(
+                    source_key, "sources", episodes[0].a_get_sources()
+                )
+                result["dubs"] = len(studios)
+                if not studios:
+                    return result
+
+                videos = await _call(source_key, "videos", studios[0].a_get_videos())
+                qualities = [int(getattr(v, "quality", 0) or 0) for v in videos]
+                result["quality"] = max(qualities) if qualities else None
+            except RpcError as exc:
+                result["error"] = exc.message
+            except Exception as exc:
+                result["error"] = str(exc)
+
+            return result
+
+        results = await asyncio.gather(
+            *(probe(entry) for entry in requested), return_exceptions=True
+        )
+
+        found: list[dict[str, Any]] = []
+        for entry, outcome in zip(requested, results):
+            if isinstance(outcome, dict):
+                found.append(outcome)
+            elif isinstance(outcome, RpcError):
+                found.append(
+                    {
+                        "source": (entry or {}).get("source"),
+                        "handle": (entry or {}).get("handle"),
+                        "quality": None,
+                        "dubs": 0,
+                        "episodes": 0,
+                        "error": outcome.message,
+                    }
+                )
+        return {"probes": found}
+
     async def anime_get(self, params: dict[str, Any]) -> dict[str, Any]:
         handle = str(_require(params, "handle"))
         entry = self.handles.get(handle)
@@ -186,6 +252,7 @@ class AnilumeService:
             "catalog.ongoing": self.catalog_ongoing,
             "catalog.search": self.catalog_search,
             "catalog.searchMulti": self.catalog_search_multi,
+            "catalog.probe": self.catalog_probe,
             "anime.get": self.anime_get,
             "anime.episodes": self.anime_episodes,
             "episode.studios": self.episode_studios,

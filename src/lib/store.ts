@@ -8,7 +8,7 @@ export type Route =
   | { name: "home" }
   | { name: "search"; query: string }
   | { name: "discover" }
-  | { name: "title"; card: AnimeCard }
+  | { name: "title"; query: string; card?: AnimeCard; source?: string }
   | { name: "library" }
   | { name: "history" }
   | { name: "downloads" }
