@@ -217,13 +217,22 @@ def anime_detail(obj: Any, handle: str, source_key: str, key: str) -> dict[str, 
         "meta": extract_meta(source_key, obj),
     }
 
+GENERIC_EPISODE = {"episode", "серия", "series", "ep", "эпизод"}
+
 def episode(obj: Any, handle: str) -> dict[str, Any]:
     ordinal = _as_int(getattr(obj, "ordinal", None))
     title = (getattr(obj, "title", "") or "").strip()
+    plain = f"Серия {ordinal}" if ordinal is not None else "Серия"
+
+    if not title or title.lower().strip(" .") in GENERIC_EPISODE:
+        title = plain
+    elif ordinal is not None and str(ordinal) not in title:
+        title = f"{plain}. {title}"
+
     return {
         "handle": handle,
         "ordinal": ordinal if ordinal is not None else 0,
-        "title": title or (f"Серия {ordinal}" if ordinal is not None else "Серия"),
+        "title": title,
     }
 
 def studio(obj: Any, handle: str) -> dict[str, Any]:

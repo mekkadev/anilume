@@ -67,7 +67,12 @@ export function Search(props: { query: string }) {
     (results()?.groups ?? []).reduce((sum, group) => sum + group.items.length, 0);
 
   const openCard = (card: AnimeCard) =>
-    navigate({ name: "title", query: card.title, card });
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.meta.altTitle ?? ""],
+      card,
+    });
 
   return (
     <div class="fade-in">

@@ -62,7 +62,7 @@ def test_ongoing_badges_are_passed_through():
 
 def test_episode_gets_generated_title_when_empty():
     assert dto.episode(FakeEpisode(7, ""), "h1")["title"] == "Серия 7"
-    assert dto.episode(FakeEpisode(7, "Название"), "h1")["title"] == "Название"
+    assert dto.episode(FakeEpisode(7, "Название"), "h1")["title"] == "Серия 7. Название"
 
 def test_studio_extracts_player_hostname():
     result = dto.studio(FakeSource("AniLibria", "https://www.kodik.info/seria/1?x=2"), "h1")
@@ -79,3 +79,18 @@ def test_video_carries_headers_for_proxy():
         "url": "https://cdn/x.m3u8",
         "headers": {"Referer": "https://kodik"},
     }
+
+
+def test_generic_episode_names_become_numbered():
+    from anilume_sidecar import dto
+
+    class Ep:
+        def __init__(self, ordinal, title):
+            self.ordinal = ordinal
+            self.title = title
+
+    assert dto.episode(Ep(3, "Episode"), "h")["title"] == "Серия 3"
+    assert dto.episode(Ep(3, ""), "h")["title"] == "Серия 3"
+    assert dto.episode(Ep(3, "серия"), "h")["title"] == "Серия 3"
+    assert dto.episode(Ep(3, "Битва под дождём"), "h")["title"] == "Серия 3. Битва под дождём"
+    assert dto.episode(Ep(3, "Серия 3"), "h")["title"] == "Серия 3"

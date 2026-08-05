@@ -228,7 +228,7 @@ export function Discover() {
   };
 
   const open = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title });
+    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
 
   return (
     <div class="fade-in">

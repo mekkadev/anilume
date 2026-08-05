@@ -171,6 +171,31 @@ test("источник без серий уступает тому, у кого 
   await expect(page.locator(".toast")).toContainText("включил", { timeout: 10000 });
 });
 
+test("чужой тайтл с похожим словом не открывается вместо нужного", async ({ page }) => {
+  await installTauri(page, {
+    overrides: {
+      catalog_search: {
+        query: "",
+        items: [
+          {
+            ...SOURCE_CARD,
+            title: "Не издевайся, Нагаторо: Вторая атака",
+            key: "k-nagatoro",
+          },
+        ],
+      },
+      catalog_search_multi: { query: "", groups: [], failures: [] },
+    },
+  });
+  await page.goto("/");
+  await page.locator(".card").first().click();
+
+  await expect(page.getByText(/Ни один источник не нашёл/)).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.locator(".title-info__name")).toHaveCount(0);
+});
+
 test("осечка источника переключает на следующий сама", async ({ page }) => {
   await installTauri(page, {
     failWhen: { episode_studios: "search-0:" },
@@ -187,12 +212,18 @@ test("осечка источника переключает на следующ
   await page.goto("/");
   await page.locator(".card").first().click();
   await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
-  await expect(page.locator(".picker__item")).toHaveCount(2, { timeout: 8000 });
+  await expect(page.locator(".picker__item")).toHaveCount(1);
 
   await page.locator(".episode__main").first().click();
 
-  await expect(page.locator(".toast")).toContainText("включил", { timeout: 10000 });
+  await expect(page.locator(".toast").first()).toContainText("ищу в других", {
+    timeout: 10000,
+  });
+  await expect(page.locator(".toast", { hasText: "включил" })).toBeVisible({
+    timeout: 12000,
+  });
   await expect(page.locator(".player")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator(".picker__item")).toHaveCount(2);
 });
 
 test("палитра ищет по мере ввода и открывает стрелками", async ({ page }) => {

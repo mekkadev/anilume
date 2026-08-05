@@ -9,7 +9,13 @@ export type Route =
   | { name: "search"; query: string }
   | { name: "discover" }
   | { name: "schedule" }
-  | { name: "title"; query: string; card?: AnimeCard; source?: string }
+  | {
+      name: "title";
+      query: string;
+      aliases?: string[];
+      card?: AnimeCard;
+      source?: string;
+    }
   | { name: "library" }
   | { name: "history" }
   | { name: "downloads" }

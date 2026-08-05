@@ -180,6 +180,7 @@ export function App() {
                       {(target) => (
                         <Title
                           query={target.query}
+                          aliases={target.aliases}
                           card={target.card}
                           source={target.source}
                         />

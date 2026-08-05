@@ -94,7 +94,7 @@ export const FIXTURES: Record<string, unknown> = {
   },
 
   catalog_ongoing: { items: cards },
-  catalog_search: { items: cards, query: "" },
+  catalog_search: { items: cards, query: "", echo: true },
   catalog_search_multi: { query: "", groups: [{ source: "anilibria", items: cards }], failures: [] },
   catalog_probe: { probes: [] },
   anime_get: ANIME_DETAIL,
@@ -259,11 +259,11 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
         if (cmd === "catalog_search") {
           const query = String(args?.query ?? "");
           anyWindow.__QUERY__ = query;
-          const base = (config.fixtures.catalog_search as { items: unknown[] }).items[0];
-          value = {
-            query,
-            items: [{ ...(base as object), title: query, key: `k-${query}` }],
-          };
+          const stub = value as { items: { title?: string }[]; echo?: boolean };
+          const base = stub.items[0]!;
+          value = stub.echo
+            ? { query, items: [{ ...base, title: query, key: `k-${query}` }] }
+            : stub;
         }
         if (cmd === "anime_get") {
           const handle = String(args?.handle ?? "anime");

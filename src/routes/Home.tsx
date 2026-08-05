@@ -125,10 +125,15 @@ export function Home() {
   onCleanup(() => setAmbient(null));
 
   const openCard = (card: AnimeCard) =>
-    navigate({ name: "title", query: card.title, card });
+    navigate({
+      name: "title",
+      query: card.title,
+      aliases: [card.meta.altTitle ?? ""],
+      card,
+    });
 
   const openShiki = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title });
+    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
 
   const openContinue = (item: ContinueItem) =>
     navigate({ name: "title", query: item.animeTitle, source: item.source });

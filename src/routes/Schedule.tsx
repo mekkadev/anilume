@@ -85,7 +85,11 @@ export function Schedule() {
   );
 
   const open = (item: Upcoming) =>
-    navigate({ name: "title", query: item.card.title });
+    navigate({
+      name: "title",
+      query: item.card.title,
+      aliases: [item.card.originalTitle],
+    });
 
   return (
     <div class="fade-in">

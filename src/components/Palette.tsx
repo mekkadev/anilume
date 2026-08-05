@@ -93,9 +93,18 @@ export function Palette() {
   const open = (hit: Hit) => {
     closePalette();
     if (hit.kind === "shiki") {
-      navigate({ name: "title", query: hit.card.title });
+      navigate({
+        name: "title",
+        query: hit.card.title,
+        aliases: [hit.card.originalTitle],
+      });
     } else {
-      navigate({ name: "title", query: hit.card.title, card: hit.card });
+      navigate({
+        name: "title",
+        query: hit.card.title,
+        aliases: [hit.card.meta.altTitle ?? ""],
+        card: hit.card,
+      });
     }
   };
 

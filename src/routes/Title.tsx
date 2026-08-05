@@ -15,6 +15,7 @@ import { Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt } from "../lib/art";
+import { pickMatch } from "../lib/match";
 import { pending, settled } from "../lib/resource";
 import { episodesLabel, plural, qualityLabel } from "../lib/format";
 import {
@@ -78,17 +79,21 @@ interface Resolved {
   videos: VideoInfo[];
 }
 
-function pickBest(items: AnimeCard[], query: string) {
-  const needle = query.trim().toLowerCase();
-  return (
-    items.find((item) => item.title.trim().toLowerCase() === needle) ??
-    items.find((item) => item.title.toLowerCase().includes(needle)) ??
-    items[0] ??
-    null
-  );
+function pickBest(items: AnimeCard[], aliases: string[]) {
+  return pickMatch(items, aliases, (item) => item.title);
 }
 
-export function Title(props: { query: string; card?: AnimeCard; source?: string }) {
+export function Title(props: {
+  query: string;
+  aliases?: string[];
+  card?: AnimeCard;
+  source?: string;
+}) {
+  const names = () => {
+    const found = [props.query, ...(props.aliases ?? [])];
+    return [...new Set(found.map((item) => item.trim()).filter(Boolean))];
+  };
+
   const [candidates, setCandidates] = createSignal<Record<string, AnimeCard>>({});
   const [chosen, setChosen] = createSignal<string | null>(null);
   const [pinned, setPinned] = createSignal(false);
@@ -126,7 +131,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
         tried.add(key);
         const found = await api
           .search(key, query)
-          .then((result) => pickBest(result.items, query))
+          .then((result) => pickBest(result.items, names()))
           .catch(() => null);
         if (found) {
           remember(found);
@@ -176,7 +181,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
       const result = await api.searchMulti(rest, props.query);
       const merged = { ...candidates() };
       for (const group of result.groups) {
-        const best = pickBest(group.items, props.query);
+        const best = pickBest(group.items, names());
         if (best) merged[group.source] = best;
       }
       setCandidates(merged);
@@ -264,6 +269,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
 
   createEffect(() => {
     if (!decided()) return;
+    if (!missing() && !barren() && detailRes.state !== "errored") return;
     untrack(() => void scanOthers());
   });
 
@@ -331,7 +337,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
   onCleanup(() => setAmbient(null));
 
   const openShiki = (card: DiscoverCard) =>
-    navigate({ name: "title", query: card.title });
+    navigate({ name: "title", query: card.title, aliases: [card.originalTitle] });
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
   const [pickedDub, setPickedDub] = createSignal(false);
@@ -492,17 +498,20 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
         ];
       } else {
         const current = active();
-        const queue = current
-          ? [current, ...available().filter((item) => item.source !== current.source)]
-          : available();
-
         let found: Resolved | null = null;
-        for (const candidate of queue) {
-          found = await resolveFrom(
-            candidate,
-            episode.ordinal,
-            candidate.source === source() ? info : undefined,
-          ).catch(() => null);
+
+        if (current) {
+          found = await resolveFrom(current, episode.ordinal, info).catch(() => null);
+        }
+
+        if (!found && !scanned()) {
+          pushToast("Источник не отдал серию — ищу в других", "info");
+          await scanOthers();
+        }
+
+        const queue = available().filter((item) => item.source !== current?.source);
+        for (const candidate of found ? [] : queue) {
+          found = await resolveFrom(candidate, episode.ordinal).catch(() => null);
           if (found) break;
         }
 
@@ -851,6 +860,14 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                           <span class="spinner" />
                           {probing() ? "проверяем качество" : "ищем в других источниках"}
                         </span>
+                      </Show>
+                      <Show when={!scanning() && !probing() && !scanned()}>
+                        <button
+                          class="link-btn"
+                          onClick={() => void scanOthers()}
+                        >
+                          Поискать в других источниках
+                        </button>
                       </Show>
                     </div>
 
