@@ -83,8 +83,8 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 
 Поэтому страница каталога спрашивает [Shikimori](https://shikimori.one):
 46 жанров, 1910 студий, диапазон лет, статус выхода, тип и пять сортировок —
-всё из публичного API, без аккаунта. Выбранный тайтл ищется по названию
-в том источнике, что выбран в рельсе, и открывается там.
+всё из публичного API, без аккаунта. Выбранный тайтл открывается по названию,
+а где его смотреть — решается уже на его странице.
 
 Оттуда же приходят ряды на главной, студия и хронометраж на странице аниме,
 её сезоны, похожее и обсуждение под ней. Тайтл, открытый из источника,
@@ -357,8 +357,8 @@ and nothing else.
 
 so the catalogue page asks [shikimori](https://shikimori.one) instead: 46 genres,
 1910 studios, a year range, airing status, type, and five sort orders, all from
-its public api with no account needed. picking a title then searches for it by
-name in whichever source is selected in the rail and opens it there.
+its public api with no account needed. picking a title opens it by name; where to
+watch it is decided on its own page.
 
 the same connection feeds the home rows, the studio and runtime on a title page,
 its seasons, what else is like it, and the discussion under it. a title opened
