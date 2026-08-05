@@ -72,6 +72,7 @@ export interface Toast {
   tone: "info" | "error" | "success";
   message: string;
   hint?: string;
+  action?: () => void;
 }
 
 const [toasts, setToasts] = createStore<Toast[]>([]);
@@ -83,10 +84,13 @@ export function pushToast(
   message: string,
   tone: Toast["tone"] = "info",
   hint?: string,
+  action?: () => void,
 ) {
   const id = ++toastId;
-  setToasts((current) => [...current, { id, tone, message, hint }]);
-  setTimeout(() => dismissToast(id), tone === "error" ? 7000 : 3800);
+  setToasts((current) => [...current, { id, tone, message, hint, action }]);
+  if (!action) {
+    setTimeout(() => dismissToast(id), tone === "error" ? 7000 : 3800);
+  }
 }
 
 export function dismissToast(id: number) {
@@ -113,6 +117,9 @@ export interface PlaybackRequest {
   startAt: number;
   qualityIndex: number;
   autoplayNext: boolean;
+  offline: boolean;
+  malId: number | null;
+  episodeNumbers: number[];
 }
 
 const [playback, setPlayback] = createSignal<PlaybackRequest | null>(null);

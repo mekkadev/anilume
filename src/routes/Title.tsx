@@ -29,6 +29,7 @@ import {
 import { openPlayer, pushToast, reportError, sourceName } from "../lib/store";
 import type {
   AnimeCard,
+  VideoInfo,
   AnimeDetail,
   EpisodeInfo,
   LibraryEntry,
@@ -138,13 +139,35 @@ export function Title(props: { card: AnimeCard }) {
 
     setBusyEpisode(episode.ordinal);
     try {
-      const studio = await resolveStudio(episode);
-      if (!studio) return;
+      const downloaded = await api
+        .downloadsFindCompleted(props.card.source, props.card.key, episode.ordinal)
+        .catch(() => null);
 
-      const { videos } = await api.videos(studio.handle);
-      if (videos.length === 0) {
-        pushToast(`«${studio.title}» не отдал видео — выберите другую озвучку`, "error");
-        return;
+      let studioTitle: string | null = null;
+      let videos: VideoInfo[];
+
+      if (downloaded) {
+        const { convertFileSrc } = await import("@tauri-apps/api/core");
+        studioTitle = downloaded.studio;
+        videos = [
+          {
+            type: "mp4",
+            quality: downloaded.quality,
+            url: convertFileSrc(downloaded.filePath),
+            headers: {},
+          },
+        ];
+      } else {
+        const studio = await resolveStudio(episode);
+        if (!studio) return;
+
+        studioTitle = studio.title;
+        const resolved = await api.videos(studio.handle);
+        if (resolved.videos.length === 0) {
+          pushToast(`«${studio.title}» не отдал видео — выберите другую озвучку`, "error");
+          return;
+        }
+        videos = resolved.videos;
       }
 
       const saved = progressFor(episode.ordinal);
@@ -160,11 +183,14 @@ export function Title(props: { card: AnimeCard }) {
         poster: info.poster,
         episodes: info.episodes,
         episodeIndex: info.episodes.findIndex((ep) => ep.ordinal === episode.ordinal),
-        studioTitle: studio.title,
+        studioTitle,
         videos,
         startAt: resumeAt,
-        qualityIndex: pickQualityIndex(videos, qualityPref()),
+        qualityIndex: downloaded ? 0 : pickQualityIndex(videos, qualityPref()),
         autoplayNext: autoplayNext(),
+        offline: Boolean(downloaded),
+        malId: info.meta.malId ?? null,
+        episodeNumbers: info.episodes.map((item) => item.ordinal),
       });
     } catch (error) {
       reportError(error);

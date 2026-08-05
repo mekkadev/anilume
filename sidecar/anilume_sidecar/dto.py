@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
@@ -70,6 +71,7 @@ def empty_meta() -> dict[str, Any]:
         "shikimoriId": None,
         "episodeDurationMin": None,
         "tags": [],
+        "malId": None,
     }
 
 def _meta_animego(raw: Any) -> dict[str, Any]:
@@ -113,6 +115,7 @@ def _meta_yummy(raw: Any) -> dict[str, Any]:
     meta["status"] = _dig(raw, "anime_status", "title")
     meta["ageRating"] = _dig(raw, "min_age", "title")
     meta["shikimoriId"] = _as_int(_dig(raw, "remote_ids", "shikimori_id"))
+    meta["malId"] = _as_int(_dig(raw, "remote_ids", "myanimelist_id")) or meta["shikimoriId"]
 
     meta["score"] = _as_float(_dig(raw, "rating", "average")) or _as_float(
         _dig(raw, "rating", "shikimori_rating")
@@ -135,6 +138,13 @@ def _meta_animelib(raw: Any) -> dict[str, Any]:
         or _as_int(raw.get("episodes_count"))
     )
     meta["tags"] = _names(raw.get("tags"), "name")[:12]
+
+    href = raw.get("shikimori_href")
+    if isinstance(href, str):
+        found = re.search(r"/(?:animes/)?[a-z]*(\d+)", href)
+        if found:
+            meta["shikimoriId"] = _as_int(found.group(1))
+            meta["malId"] = meta["shikimoriId"]
     meta["kind"] = _dig(raw, "type", "label")
     meta["status"] = _dig(raw, "status", "label")
     meta["ageRating"] = _dig(raw, "ageRestriction", "label")

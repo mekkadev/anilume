@@ -47,10 +47,18 @@
         "script-src": "'self' 'wasm-unsafe-eval'",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:",
-        "img-src": "'self' data: blob: https: http:",
-        "media-src": "'self' blob: http://127.0.0.1:* http://localhost:*",
+        "img-src": "'self' data: blob: https: http: asset: http://asset.localhost",
+        "media-src": "'self' blob: http://127.0.0.1:* http://localhost:* asset: http://asset.localhost https://asset.localhost",
         "worker-src": "'self' blob:",
-        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:*"
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* asset: http://asset.localhost https://asset.localhost"
+      },
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$VIDEO/**",
+          "$HOME/Videos/**",
+          "$HOME/Movies/**"
+        ]
       }
     }
   },
@@ -89,6 +97,17 @@
           "Russian",
           "English"
         ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/mekkadev/anilume/releases/latest/download/latest.json"
+      ],
+      "pubkey": "ЗАМЕНИТЕ_НА_ПУБЛИЧНЫЙ_КЛЮЧ",
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

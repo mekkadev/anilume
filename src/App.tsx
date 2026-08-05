@@ -12,6 +12,7 @@ import { Search } from "./routes/Search";
 import { Settings } from "./routes/Settings";
 import { Title } from "./routes/Title";
 import { loadPrefs, restoreSourceConfig } from "./lib/prefs";
+import { checkForUpdate } from "./lib/api";
 import {
   canGoBack,
   goBack,
@@ -19,6 +20,7 @@ import {
   matchRoute,
   navigate,
   playback,
+  pushToast,
   reportError,
   route,
 } from "./lib/store";
@@ -32,6 +34,16 @@ export function App() {
     loadSources().catch(reportError);
     void loadPrefs().catch(() => undefined);
     void restoreSourceConfig().catch(() => undefined);
+
+    void checkForUpdate().then((update) => {
+      if (!update) return;
+      pushToast(
+        `Доступна версия ${update.version} — нажмите, чтобы обновить`,
+        "info",
+        "Приложение перезапустится после установки",
+        () => void update.install(),
+      );
+    });
 
     void import("@tauri-apps/plugin-os")
       .then(({ platform }) => {

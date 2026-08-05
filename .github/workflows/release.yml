@@ -103,7 +103,19 @@ jobs:
         run: npm ci
 
       - name: Собрать приложение
-        run: npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "Ключ подписи есть — собираем с артефактами обновления"
+            npm run tauri build -- --target ${{ matrix.target }} \
+              --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          else
+            echo "Ключа подписи нет — обновление в этой сборке отключено"
+            npm run tauri build -- --target ${{ matrix.target }}
+          fi
 
       - name: Собрать список файлов
         id: collect
@@ -111,7 +123,8 @@ jobs:
         run: |
           mkdir -p artifacts
           bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
-          find "$bundle" -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) \
+          find "$bundle" -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \
+            -o -name '*.sig' -o -name '*.app.tar.gz' \) \
             -exec cp {} artifacts/ \;
           ls -lh artifacts
 

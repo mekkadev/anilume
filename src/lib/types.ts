@@ -18,6 +18,7 @@ export interface AnimeMeta {
   shikimoriId: number | null;
   episodeDurationMin: number | null;
   tags: string[];
+  malId: number | null;
 }
 
 export interface AnimeCard {
