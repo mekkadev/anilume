@@ -130,7 +130,9 @@ jobs:
         shell: bash
         run: |
           binary=$(ls src-tauri/binaries/anilume-sidecar-${{ matrix.target }}*)
-          echo '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' | "$binary" | tee /dev/stderr | grep -q '"ok":true'
+          answer=$(echo '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' | "$binary")
+          echo "$answer"
+          echo "$answer" | grep -q '"ok":true'
 
       - name: Кеш сборок ffmpeg
         uses: actions/cache@v4
