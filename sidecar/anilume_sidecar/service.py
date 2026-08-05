@@ -18,6 +18,8 @@ log = logging.getLogger("anilume.service")
 
 UPSTREAM_TIMEOUT = 12.0
 PROBE_TIMEOUT = 20.0
+QUALITY_TIMEOUT = 14.0
+PROBE_STUDIOS = 4
 
 def _require(params: dict[str, Any], name: str) -> Any:
     value = params.get(name)
@@ -141,9 +143,25 @@ class AnilumeService:
             if not studios:
                 return
 
-            videos = await _call(source_key, "videos", studios[0].a_get_videos())
-            qualities = [int(getattr(v, "quality", 0) or 0) for v in videos]
-            result["quality"] = max(qualities) if qualities else None
+            async def peak(studio: Any) -> int:
+                try:
+                    videos = await _call(source_key, "videos", studio.a_get_videos())
+                except RpcError:
+                    return 0
+                return max(
+                    (int(getattr(v, "quality", 0) or 0) for v in videos),
+                    default=0,
+                )
+
+            measured = await asyncio.gather(
+                *(peak(studio) for studio in studios[:PROBE_STUDIOS]),
+                return_exceptions=True,
+            )
+            best = max(
+                (value for value in measured if isinstance(value, int)),
+                default=0,
+            )
+            result["quality"] = best or None
 
         async def probe(entry: Any) -> dict[str, Any]:
             if not isinstance(entry, dict):
@@ -235,6 +253,37 @@ class AnilumeService:
             ]
         }
 
+    async def studio_qualities(self, params: dict[str, Any]) -> dict[str, Any]:
+        handles = params.get("handles")
+        if not isinstance(handles, list):
+            raise RpcError(INVALID_PARAMS, "Параметр «handles» должен быть списком")
+
+        async def measure(handle: Any) -> dict[str, Any]:
+            key = str(handle)
+            record = self.handles.peek(key)
+            if record is None:
+                return {"handle": key, "quality": None, "error": "карточка устарела"}
+
+            try:
+                videos = await asyncio.wait_for(
+                    _call(record.source_key, "videos", record.obj.a_get_videos()),
+                    timeout=QUALITY_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                return {"handle": key, "quality": None, "error": "плеер не ответил вовремя"}
+            except RpcError as exc:
+                return {"handle": key, "quality": None, "error": exc.message}
+            except Exception as exc:
+                return {"handle": key, "quality": None, "error": str(exc)}
+
+            best = max((int(getattr(v, "quality", 0) or 0) for v in videos), default=0)
+            return {"handle": key, "quality": best or None, "error": None}
+
+        found = await asyncio.gather(
+            *(measure(handle) for handle in handles), return_exceptions=True
+        )
+        return {"qualities": [item for item in found if isinstance(item, dict)]}
+
     async def studio_videos(self, params: dict[str, Any]) -> dict[str, Any]:
         handle = str(_require(params, "handle"))
         entry = self.handles.get(handle, "source")
@@ -264,4 +313,5 @@ class AnilumeService:
             "anime.episodes": self.anime_episodes,
             "episode.studios": self.episode_studios,
             "studio.videos": self.studio_videos,
+            "studio.qualities": self.studio_qualities,
         }

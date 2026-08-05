@@ -112,6 +112,7 @@ pub fn run() {
             commands::animelib_servers,
             commands::episode_studios,
             commands::studio_videos,
+            commands::studio_qualities,
             commands::discover_options,
             commands::discover_search,
             commands::discover_title,

@@ -120,6 +120,7 @@ async def test_dispatch_table_covers_documented_methods(service):
         "anime.episodes",
         "episode.studios",
         "studio.videos",
+        "studio.qualities",
     }
 
 

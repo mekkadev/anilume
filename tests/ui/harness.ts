@@ -102,6 +102,12 @@ export const FIXTURES: Record<string, unknown> = {
       { handle: "source-2", title: "Студийная банда", player: "aniboom.one", url: "https://a/2" },
     ],
   },
+  studio_qualities: {
+    qualities: [
+      { handle: "source-1", quality: 720, error: null },
+      { handle: "source-2", quality: 1080, error: null },
+    ],
+  },
   studio_videos: {
     videos: [
       { type: "mp4", quality: 1080, url: "https://stub.local/v.mp4", headers: {} },

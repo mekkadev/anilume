@@ -25,6 +25,12 @@ export interface CacheStats {
   bytes: number;
 }
 
+export interface StudioQuality {
+  handle: string;
+  quality: number | null;
+  error: string | null;
+}
+
 export interface SourceProbe {
   source: string;
   handle: string;

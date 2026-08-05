@@ -1103,3 +1103,22 @@
   filter: blur(26px) saturate(150%);
   transform: scale(1.16);
 }
+
+.dub__quality {
+  font-size: var(--text-caption);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: var(--fill);
+  color: var(--ink-2);
+}
+
+.dub[data-top="true"] .dub__quality {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}
+
+.dub[data-active="true"] .dub__quality {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}

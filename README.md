@@ -91,6 +91,12 @@ Windows-сборке нужен Microsoft Edge WebView2 — он есть в Win
 дорожек. SRT конвертируется в VTT прямо в приложении. ASS не поддерживается,
 и меню говорит об этом, а не молчит.
 
+Качество определяет не источник, а озвучка: у одного тайтла StudioBand может
+отдавать 1080p, а соседняя дорожка — 720p. Поэтому приложение замеряет каждую
+озвучку и показывает её потолок прямо в списке, лучшую подсвечивает и берёт
+по умолчанию. Замер источника тоже смотрит на несколько озвучек, а не на первую
+попавшуюся.
+
 Аудиодорожки работают так же: если их несколько внутри HLS-потока, они
 переключаются в плеере, а там, где источник отдаёт каждую озвучку отдельным
 потоком (AnimeLib, Kodik), ту же работу делает выбор озвучки в один клик.
@@ -464,6 +470,11 @@ subtitles come from three places: the ones baked into an hls stream, the ones a
 source hands over as a separate track, and a `.srt` or `.vtt` file you open
 yourself from the tracks menu. srt is converted to vtt in the app; ass is not
 supported, and the menu says so rather than failing silently.
+
+quality is decided by the dub, not the source: for one title StudioBand may
+serve 1080p while the next track tops out at 720p. so the app measures every
+dub, shows its ceiling right in the list, highlights the best one and picks it
+by default. the source probe looks at several dubs too, not just the first.
 
 audio tracks work the same way — an hls stream with several of them switches
 inside the player, and where a source ships each dub as a separate stream

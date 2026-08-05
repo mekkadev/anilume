@@ -307,6 +307,7 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
     navigate({ name: "title", query: card.title });
 
   const [selectedDub, setSelectedDub] = createSignal<string | null>(null);
+  const [pickedDub, setPickedDub] = createSignal(false);
   const [busyEpisode, setBusyEpisode] = createSignal<number | null>(null);
   const [batch, setBatch] = createSignal<{ done: number; total: number } | null>(null);
   const [expanded, setExpanded] = createSignal(false);
@@ -336,6 +337,46 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
   );
   const studios = () => settled(studiosRes);
 
+  const [dubQuality, setDubQuality] = createSignal<Record<string, number | null>>({});
+  const [weighing, setWeighing] = createSignal(false);
+
+  createEffect(() => {
+    const available = studios();
+    if (!available || available.length === 0) return;
+
+    untrack(() => {
+      const unknown = available
+        .map((item) => item.handle)
+        .filter((handle) => !(handle in dubQuality()));
+      if (unknown.length === 0) return;
+
+      setWeighing(true);
+      void api
+        .studioQualities(unknown)
+        .then(({ qualities }) => {
+          const table = { ...dubQuality() };
+          for (const entry of qualities) table[entry.handle] = entry.quality;
+          setDubQuality(table);
+        })
+        .catch(() => undefined)
+        .finally(() => setWeighing(false));
+    });
+  });
+
+  const bestDub = () => {
+    const values = Object.values(dubQuality()).filter(
+      (value): value is number => typeof value === "number" && value > 0,
+    );
+    return values.length > 0 ? Math.max(...values) : null;
+  };
+
+  const dubsByQuality = () => {
+    const available = [...(studios() ?? [])];
+    return available.sort(
+      (a, b) => (dubQuality()[b.handle] ?? 0) - (dubQuality()[a.handle] ?? 0),
+    );
+  };
+
   const orderedEpisodes = createMemo(() => {
     const episodes = [...(detail()?.episodes ?? [])];
     return episodeOrder() === "desc" ? episodes.reverse() : episodes;
@@ -344,19 +385,22 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
   createEffect(() => {
     const available = studios();
     if (!available || available.length === 0) return;
-    if (selectedDub() && available.some((item) => item.title === selectedDub())) return;
+    if (weighing()) return;
+    if (pickedDub() && available.some((item) => item.title === selectedDub())) return;
 
     void (async () => {
       const remembered = rememberDub()
         ? await api.settingGet(studioSettingKey(source(), animeKey()))
         : null;
       const match = available.find((item) => item.title === remembered);
-      setSelectedDub((match ?? available[0]!).title);
+      setSelectedDub((match ?? dubsByQuality()[0] ?? available[0]!).title);
+      setPickedDub(true);
     })();
   });
 
   const chooseDub = (studio: StudioInfo) => {
     setSelectedDub(studio.title);
+    setPickedDub(true);
     if (rememberDub()) {
       void api.settingSet(
         studioSettingKey(source(), animeKey()),
@@ -858,6 +902,14 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                   <span class="page-sub">
                     {studios()!.length}{" "}
                     {plural(studios()!.length, "вариант", "варианта", "вариантов")}
+                    <Show when={weighing()}>
+                      {" · "}
+                      меряем качество
+                    </Show>
+                    <Show when={!weighing() && bestDub()}>
+                      {" · "}
+                      лучшее {qualityLabel(bestDub()!)}
+                    </Show>
                   </span>
                 </Show>
               </div>
@@ -882,20 +934,29 @@ export function Title(props: { query: string; card?: AnimeCard; source?: string 
                   }
                 >
                   <div class="dub-row">
-                    <For each={studios()}>
-                      {(studio) => (
-                        <button
-                          class="dub"
-                          data-active={selectedDub() === studio.title}
-                          onClick={() => chooseDub(studio)}
-                        >
-                          <span class="dub__name">{studio.title}</span>
-                          <span class="dub__player">{studio.player}</span>
-                          <Show when={selectedDub() === studio.title}>
-                            <Icon name="check" size={14} />
-                          </Show>
-                        </button>
-                      )}
+                    <For each={dubsByQuality()}>
+                      {(studio) => {
+                        const height = () => dubQuality()[studio.handle];
+                        return (
+                          <button
+                            class="dub"
+                            data-active={selectedDub() === studio.title}
+                            data-top={height() === bestDub() && Boolean(bestDub())}
+                            onClick={() => chooseDub(studio)}
+                          >
+                            <span class="dub__name">{studio.title}</span>
+                            <Show
+                              when={height()}
+                              fallback={<span class="dub__player">{studio.player}</span>}
+                            >
+                              <span class="dub__quality">{qualityLabel(height()!)}</span>
+                            </Show>
+                            <Show when={selectedDub() === studio.title}>
+                              <Icon name="check" size={14} />
+                            </Show>
+                          </button>
+                        );
+                      }}
                     </For>
                   </div>
                 </Show>

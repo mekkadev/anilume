@@ -112,6 +112,14 @@ pub async fn episode_studios(state: State<'_, AppState>, handle: String) -> Answ
 }
 
 #[tauri::command]
+pub async fn studio_qualities(state: State<'_, AppState>, handles: Vec<String>) -> Answer<Value> {
+    Ok(state
+        .sidecar
+        .call("studio.qualities", json!({ "handles": handles }))
+        .await?)
+}
+
+#[tauri::command]
 pub async fn studio_videos(state: State<'_, AppState>, handle: String) -> Answer<Value> {
     Ok(state
         .sidecar

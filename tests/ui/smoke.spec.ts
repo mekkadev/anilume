@@ -63,6 +63,11 @@ test("страница аниме показывает всё, что обеща
   await expect(page.getByRole("heading", { name: "Серии" })).toBeVisible();
   await expect(page.locator(".episode")).toHaveCount(12);
   await expect(page.locator(".dub").first()).toBeVisible();
+  await expect(page.locator(".dub").first()).toContainText("Студийная банда");
+  await expect(page.locator(".dub__quality").first()).toHaveText("1080p");
+  await expect(page.locator('.dub[data-active="true"] .dub__name')).toHaveText(
+    "Студийная банда",
+  );
 
   await expect(page.getByRole("heading", { name: "Сезоны и связанное" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Похожее" })).toBeVisible();
