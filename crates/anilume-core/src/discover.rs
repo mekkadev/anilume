@@ -261,7 +261,7 @@ pub struct Character {
 
 #[derive(Debug, Deserialize)]
 struct RawImage {
-  #[serde(default)]
+    #[serde(default)]
     preview: Option<String>,
     #[serde(default)]
     original: Option<String>,
