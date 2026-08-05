@@ -57,7 +57,7 @@ export function Sidebar() {
               data-active={route().name === item.name}
               onClick={() => navigate({ name: item.name })}
             >
-              <Icon name={item.icon} size={16} />
+              <Icon name={item.icon} size={18} />
               {item.label}
               <Show when={item.name === "downloads" && activeDownloads() > 0}>
                 <span class="nav-badge">{activeDownloads()}</span>
