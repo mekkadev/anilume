@@ -1,9 +1,10 @@
 import { For, Show, createResource, createSignal, onMount } from "solid-js";
 
 import { Art } from "../components/Art";
+import { RowsSkeleton } from "../components/PosterCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
-import { settled } from "../lib/resource";
+import { pending, settled } from "../lib/resource";
 import { qualityLabel } from "../lib/format";
 import { openPalette, pushToast, reportError } from "../lib/store";
 import type { DownloadItem, DownloadStatus } from "../lib/types";
@@ -104,6 +105,7 @@ export function Downloads() {
         </div>
       </Show>
 
+      <Show when={!pending(itemsRes)} fallback={<RowsSkeleton />}>
       <Show
         when={(items() ?? []).length > 0}
         fallback={
@@ -195,6 +197,7 @@ export function Downloads() {
             )}
           </For>
         </div>
+      </Show>
       </Show>
     </div>
   );

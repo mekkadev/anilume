@@ -136,6 +136,10 @@ export const FIXTURES: Record<string, unknown> = {
     topicId: 555,
   },
   discover_similar: shiki.slice(1),
+  discover_characters: [
+    { id: 1, name: "Эрен Йегер", role: "Главный герой", portrait: poster("ch-1") },
+    { id: 2, name: "Микаса Аккерман", role: "Главная героиня", portrait: poster("ch-2") },
+  ],
   discover_related: [{ relation: "Продолжение", card: shiki[1] }],
   discover_comments: [
     {
@@ -274,6 +278,27 @@ export async function installTauri(page: Page, options: HarnessOptions = {}) {
           value = stub.echo
             ? { query, items: [{ ...base, title: query, key: `k-${query}` }] }
             : stub;
+        }
+        if (cmd === "discover_search" && config.fixtures.discover_paged) {
+          const query = (args?.query ?? {}) as { page?: number };
+          const page = Number(query.page ?? 1);
+          const base = config.fixtures.discover_search as {
+            id: number;
+            title: string;
+          }[];
+          value = base.map((card) => ({
+            ...card,
+            id: card.id + page * 1000,
+            title: `${card.title} · стр. ${page}`,
+          }));
+        }
+        if (cmd === "discover_title") {
+          const id = Number(args?.id ?? 0);
+          const cards = config.fixtures.discover_search;
+          const found = Array.isArray(cards)
+            ? (cards as { id: number }[]).find((card) => card.id === id)
+            : null;
+          if (found) value = { ...(value as object), ...found };
         }
         if (cmd === "episode_studios") {
           const byPrefix = (config.fixtures.studios_by_prefix ?? null) as Record<

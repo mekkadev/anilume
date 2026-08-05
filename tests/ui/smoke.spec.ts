@@ -76,7 +76,10 @@ test("страница аниме показывает всё, что обеща
     "Студийная банда",
   );
 
-  await expect(page.getByRole("heading", { name: "Сезоны и связанное" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Франшиза" })).toBeVisible();
+  await expect(page.locator('.season-card[data-current="true"]')).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Персонажи" })).toBeVisible();
+  await expect(page.locator(".cast__name").first()).toHaveText("Эрен Йегер");
   await expect(page.getByRole("heading", { name: "Похожее" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Комментарии" })).toBeVisible();
   await expect(page.locator(".comment__body")).toContainText("Лучший тайтл сезона");
@@ -193,10 +196,13 @@ test("чужой тайтл с похожим словом не открывае
   await page.goto("/");
   await page.locator(".card").first().click();
 
-  await expect(page.getByText(/Ни один источник не нашёл/)).toBeVisible({
+  await expect(page.locator(".title-info__name")).toHaveText(TITLES[0], {
+    timeout: 8000,
+  });
+  await expect(page.getByText("Источники не отдали серии этого тайтла")).toBeVisible({
     timeout: 10000,
   });
-  await expect(page.locator(".title-info__name")).toHaveCount(0);
+  await expect(page.getByText("Нагаторо")).toHaveCount(0);
 });
 
 test("текст не вылезает за границы кнопок", async ({ page }) => {
@@ -282,8 +288,14 @@ test("одноимённые тайтлы разных лет не путают�
       },
       catalog_search_multi: { query: "", groups: [], failures: [] },
       anime_by_handle: {
-        "hxh-1999": { title: "Хантер х Хантер 1999" },
-        "hxh-2011": { title: "Хантер х Хантер 2011" },
+        "hxh-1999": {
+          title: "Хантер х Хантер 1999",
+          meta: { ...SOURCE_CARD.meta, year: 1999 },
+        },
+        "hxh-2011": {
+          title: "Хантер х Хантер 2011",
+          meta: { ...SOURCE_CARD.meta, year: 2011 },
+        },
       },
     },
   });
@@ -294,9 +306,13 @@ test("одноимённые тайтлы разных лет не путают�
   await expect(page.locator(".palette__hit")).toHaveCount(1, { timeout: 8000 });
   await page.keyboard.press("Enter");
 
-  await expect(page.locator(".title-info__name")).toHaveText("Хантер х Хантер 2011", {
+  await expect(page.locator(".title-info__name")).toHaveText("Хантер х Хантер", {
     timeout: 10000,
   });
+  await expect(page.locator(".fact__value", { hasText: "2011" })).toBeVisible({
+    timeout: 8000,
+  });
+  await expect(page.locator(".fact__value", { hasText: "1999" })).toHaveCount(0);
 });
 
 test("осечка источника переключает на следующий сама", async ({ page }) => {
@@ -375,6 +391,90 @@ test("озвучки из всех источников сливаются в о
   await expect(
     page.locator('.dub[data-active="true"]', { hasText: "AniDub" }),
   ).toBeVisible();
+});
+
+test("карточка не исчезает, даже когда все источники молчат", async ({ page }) => {
+  await installTauri(page, {
+    failWhen: { catalog_search: "" },
+    overrides: {
+      catalog_search_multi: { query: "", groups: [], failures: [] },
+    },
+  });
+
+  await page.goto("/");
+  await page.locator(".card").first().click();
+
+  await expect(page.locator(".title-info__name")).toHaveText(TITLES[0], {
+    timeout: 8000,
+  });
+  await expect(page.locator(".title-info__text")).toContainText("Полное описание");
+  await expect(page.getByText("Источники не отдали серии этого тайтла")).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.getByRole("heading", { name: "Похожее" })).toBeVisible();
+  await expect(page.locator(".empty__title")).toHaveCount(0);
+});
+
+test("«Показать ещё» не гасит уже загруженные постеры", async ({ page }) => {
+  await installTauri(page, { overrides: { discover_paged: true } });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Каталог" }).click();
+  await expect(page.locator(".poster-grid .card")).toHaveCount(4, { timeout: 8000 });
+
+  const first = page.locator(".poster-grid .card img").first();
+  await expect(first).toHaveAttribute("data-loaded", "true", { timeout: 8000 });
+
+  await page.getByRole("button", { name: "Показать ещё" }).click();
+  await expect(page.locator(".poster-grid .card")).toHaveCount(8, { timeout: 8000 });
+
+  await page.waitForTimeout(400);
+  await expect(first).toHaveAttribute("data-loaded", "true");
+});
+
+test("пустой тайтл не прыгает на другую часть франшизы", async ({ page }) => {
+  await installTauri(page, {
+    overrides: {
+      anime_get: { ...ANIME_DETAIL, episodes: [] },
+      catalog_search: {
+        query: "",
+        items: [{ ...SOURCE_CARD, meta: { ...SOURCE_CARD.meta, year: 2019 } }],
+      },
+      catalog_search_multi: {
+        query: "",
+        groups: [
+          {
+            source: "animego",
+            items: [
+              {
+                ...SOURCE_CARD,
+                source: "animego",
+                handle: "s-final",
+                key: "k-final",
+                title: `${TITLES[0]}: Финал`,
+                meta: { ...SOURCE_CARD.meta, year: 2019 },
+              },
+            ],
+          },
+        ],
+        failures: [],
+      },
+      catalog_probe: {
+        probes: [
+          { source: "anilibria", handle: "search-0", quality: null, dubs: 0, episodes: 0, error: null },
+          { source: "animego", handle: "s-final", quality: 1080, dubs: 2, episodes: 12, error: null },
+        ],
+      },
+    },
+  });
+
+  await page.goto("/");
+  await page.locator(".card").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+
+  await page.waitForTimeout(900);
+  await expect(page.locator(".title-info__name")).toHaveText(TITLES[0]);
+  await expect(page.locator(".toast", { hasText: "переключил" })).toHaveCount(0);
 });
 
 test("чужой сезон с лучшим качеством не перехватывает страницу", async ({ page }) => {

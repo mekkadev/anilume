@@ -1,5 +1,6 @@
 import {
   For,
+  Index,
   Show,
   createEffect,
   createMemo,
@@ -11,7 +12,7 @@ import {
 
 import { Art } from "../components/Art";
 import { Icon } from "../components/Icon";
-import { Score, ShikiCard } from "../components/ShikiCard";
+import { STATUS_LABELS, Score, ShikiCard } from "../components/ShikiCard";
 import { Toggle } from "../components/Toggle";
 import { api } from "../lib/api";
 import { bannerFor, coverFor, ensureArt, posterFor } from "../lib/art";
@@ -278,7 +279,7 @@ export function Title(props: {
     if (!hollow && (probes()[best.source]?.quality ?? 0) <= (current?.quality ?? 0)) {
       return;
     }
-    if (!hollow && !kin(best, candidates()[key] ?? null)) return;
+    if (!kin(best, candidates()[key] ?? null)) return;
     if (empty(best.source)) return;
 
     if (hollow) {
@@ -373,6 +374,12 @@ export function Title(props: {
     (topicId) => api.discoverComments(topicId, 15),
   );
 
+  const [castRes] = createResource(
+    () => shiki()?.id ?? null,
+    (id) => api.discoverCharacters(id, 14),
+  );
+  const cast = () => settled(castRes) ?? [];
+
   const related = () => settled(relatedRes);
   const similar = () => settled(similarRes);
   const comments = () => settled(commentsRes);
@@ -381,7 +388,28 @@ export function Title(props: {
 
   const heroArt = () => shiki()?.art[0] ?? bannerFor(shiki()?.id) ?? null;
   const poster = () =>
-    posterFor(shiki()?.id, shiki()?.poster ?? detail()?.poster ?? null);
+    posterFor(
+      shiki()?.id ?? props.shikiId,
+      shiki()?.poster ?? detail()?.poster ?? props.card?.poster ?? null,
+    );
+
+  const anything = () => Boolean(detail() || shiki());
+  const nowhere = () => decided() && scanned() && available().length === 0;
+  const shownTitle = () => shiki()?.title ?? detail()?.title ?? props.query;
+  const shownAlt = () => shiki()?.japanese ?? detail()?.meta.altTitle ?? null;
+  const shownScore = () => shiki()?.score ?? detail()?.meta.score ?? null;
+  const shownEpisodes = () =>
+    detail()?.episodes.length ?? shiki()?.episodes ?? null;
+  const shownYear = () => detail()?.meta.year ?? shiki()?.year ?? wantYear();
+  const shownStatus = () => {
+    const own = detail()?.meta.status;
+    if (own) return own;
+    const foreign = shiki()?.status;
+    return foreign ? (STATUS_LABELS[foreign] ?? foreign) : null;
+  };
+  const shownGenres = () => shiki()?.genres ?? detail()?.meta.genres ?? [];
+  const shownText = () => shiki()?.description || detail()?.description || "";
+  const stills = () => (shiki()?.art ?? []).slice(1, 9);
 
   createEffect(() => {
     const ids = [
@@ -926,10 +954,10 @@ export function Title(props: {
   return (
     <div class="fade-in">
       <Show
-        when={detail()}
+        when={anything()}
         fallback={
           <Show
-            when={decided() && scanned() && available().length === 0}
+            when={nowhere()}
             fallback={
               <TitleSkeleton
                 title={props.query}
@@ -955,9 +983,8 @@ export function Title(props: {
           </Show>
         }
       >
-        {(info) => (
-          <>
-            <section class="title-hero">
+        <>
+          <section class="title-hero">
               <div class="title-hero__art">
                 <Show when={heroArt()}>
                   <img src={heroArt()!} alt="" decoding="async" />
@@ -967,21 +994,19 @@ export function Title(props: {
 
               <div class="title-hero__grid">
                 <div class="title-poster">
-                  <Art src={poster()} title={info().title} eager />
+                  <Art src={poster()} title={shownTitle()} eager />
                 </div>
 
                 <div class="title-info">
                   <div>
-                    <h1 class="title-info__name">{info().title}</h1>
-                    <Show when={shiki()?.japanese ?? info().meta.altTitle}>
-                      <div class="title-info__alt">
-                        {shiki()?.japanese ?? info().meta.altTitle}
-                      </div>
+                    <h1 class="title-info__name">{shownTitle()}</h1>
+                    <Show when={shownAlt()}>
+                      <div class="title-info__alt">{shownAlt()}</div>
                     </Show>
                   </div>
 
                   <div class="title-info__row">
-                    <Show when={shiki()?.score ?? info().meta.score}>
+                    <Show when={shownScore()}>
                       {(value) => (
                         <div class="score-block">
                           <span class="score-block__label">Оценка</span>
@@ -999,50 +1024,50 @@ export function Title(props: {
                           </div>
                         </div>
                       </Show>
-                      <div>
-                        <div class="fact__label">Серии</div>
-                        <div class="fact__value">
-                          {episodesLabel(info().episodes.length)}
+                      <Show when={shownEpisodes()}>
+                        <div>
+                          <div class="fact__label">Серии</div>
+                          <div class="fact__value">
+                            {episodesLabel(shownEpisodes()!)}
+                          </div>
                         </div>
-                      </div>
+                      </Show>
                       <Show when={shiki()?.duration}>
                         <div>
                           <div class="fact__label">Серия идёт</div>
                           <div class="fact__value">{shiki()!.duration} мин.</div>
                         </div>
                       </Show>
-                      <Show when={info().meta.year}>
+                      <Show when={shownYear()}>
                         <div>
                           <div class="fact__label">Год</div>
-                          <div class="fact__value">{info().meta.year}</div>
+                          <div class="fact__value">{shownYear()}</div>
                         </div>
                       </Show>
-                      <Show when={info().meta.status}>
+                      <Show when={shownStatus()}>
                         <div>
                           <div class="fact__label">Статус</div>
-                          <div class="fact__value">{info().meta.status}</div>
+                          <div class="fact__value">{shownStatus()}</div>
                         </div>
                       </Show>
                     </div>
                   </div>
 
-                  <Show
-                    when={(shiki()?.genres ?? info().meta.genres ?? []).length > 0}
-                  >
+                  <Show when={shownGenres().length > 0}>
                     <div class="title-info__row">
-                      <For each={shiki()?.genres ?? info().meta.genres ?? []}>
+                      <For each={shownGenres()}>
                         {(genre) => <span class="chip">{genre}</span>}
                       </For>
-                      <Show when={info().meta.ageRating}>
-                        <span class="chip">{info().meta.ageRating}</span>
+                      <Show when={detail()?.meta.ageRating}>
+                        <span class="chip">{detail()!.meta.ageRating}</span>
                       </Show>
                     </div>
                   </Show>
 
-                  <Show when={shiki()?.description || info().description}>
+                  <Show when={shownText()}>
                     <div>
                       <p class="title-info__text" data-clamped={!expanded()}>
-                        {shiki()?.description || info().description}
+                        {shownText()}
                       </p>
                       <button class="link-btn" onClick={() => setExpanded(!expanded())}>
                         {expanded() ? "Свернуть" : "Читать полностью"}
@@ -1051,7 +1076,17 @@ export function Title(props: {
                   </Show>
 
                   <div class="title-info__row">
-                    <Show when={nextEpisode()}>
+                    <Show
+                      when={nextEpisode()}
+                      fallback={
+                        <Show when={!nowhere()}>
+                          <button class="btn btn--primary btn--lg" disabled>
+                            <span class="spinner" />
+                            Ищем серии…
+                          </button>
+                        </Show>
+                      }
+                    >
                       {(episode) => (
                         <button
                           class="btn btn--primary btn--lg"
@@ -1066,11 +1101,13 @@ export function Title(props: {
                       )}
                     </Show>
 
-                    <LibraryMenu
-                      current={libraryEntry()?.status ?? null}
-                      onPick={(status) => void setLibraryStatus(status)}
-                      onRemove={() => void removeFromLibrary()}
-                    />
+                    <Show when={detail()}>
+                      <LibraryMenu
+                        current={libraryEntry()?.status ?? null}
+                        onPick={(status) => void setLibraryStatus(status)}
+                        onRemove={() => void removeFromLibrary()}
+                      />
+                    </Show>
 
                     <ViewSettings />
                   </div>
@@ -1078,6 +1115,45 @@ export function Title(props: {
               </div>
             </section>
 
+            <Show when={nowhere() && !detail()}>
+              <div class="notice notice--warning">
+                <Icon name="search" size={18} />
+                <div>
+                  <strong>Источники не отдали серии этого тайтла</strong>
+                  <div>
+                    Попробуйте оригинальное название через поиск — или выберите
+                    другую часть франшизы ниже.
+                  </div>
+                </div>
+                <button
+                  class="btn"
+                  onClick={() => navigate({ name: "search", query: props.query })}
+                >
+                  Открыть поиск
+                </button>
+              </div>
+            </Show>
+
+            <Show when={!detail() && !nowhere()}>
+              <section class="section">
+                <div class="section__head">
+                  <h2 class="section__title">Серии</h2>
+                  <span class="page-sub">ищем источники…</span>
+                </div>
+                <div class="episode-grid">
+                  <Index each={Array(8).fill(0)}>
+                    {() => (
+                      <div
+                        class="skeleton"
+                        style={{ height: "42px", "border-radius": "9px" }}
+                      />
+                    )}
+                  </Index>
+                </div>
+              </section>
+            </Show>
+
+            <Show when={detail()}>
             <section class="section">
               <div class="section__head">
                 <h2 class="section__title">Озвучка и плеер</h2>
@@ -1267,15 +1343,35 @@ export function Title(props: {
                 </For>
               </div>
             </section>
+            </Show>
 
             <Show when={(related() ?? []).length > 0}>
               <section class="row">
                 <div class="row__head">
-                  <h2 class="section__title">Сезоны и связанное</h2>
-                  <span class="page-sub">по данным Shikimori</span>
+                  <h2 class="section__title">Франшиза</h2>
+                  <span class="page-sub">
+                    переход — только по вашему клику
+                  </span>
                 </div>
 
                 <div class="row__track row__track--wide">
+                  <Show when={shiki()}>
+                    {(current) => (
+                      <div class="season-card" data-current="true">
+                        <div class="season-card__art">
+                          <Art
+                            src={coverFor(current().id, current().poster)}
+                            title={current().title}
+                          />
+                          <span class="season-card__relation">
+                            <Icon name="check" size={11} />
+                            Открыто
+                          </span>
+                        </div>
+                        <div class="season-card__title">{current().title}</div>
+                      </div>
+                    )}
+                  </Show>
                   <For each={related()}>
                     {(entry) => (
                       <button
@@ -1291,6 +1387,46 @@ export function Title(props: {
                         </div>
                         <div class="season-card__title">{entry.card.title}</div>
                       </button>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
+
+            <Show when={cast().length > 0}>
+              <section class="row">
+                <div class="row__head">
+                  <h2 class="section__title">Персонажи</h2>
+                </div>
+                <div class="cast">
+                  <For each={cast()}>
+                    {(person) => (
+                      <div class="cast__item" title={person.role}>
+                        <div class="cast__portrait">
+                          <Art src={person.portrait} title={person.name} />
+                        </div>
+                        <div class="cast__name">{person.name}</div>
+                        <Show when={person.role}>
+                          <div class="cast__role">{person.role}</div>
+                        </Show>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
+
+            <Show when={stills().length > 0}>
+              <section class="row">
+                <div class="row__head">
+                  <h2 class="section__title">Кадры</h2>
+                </div>
+                <div class="stills">
+                  <For each={stills()}>
+                    {(shot) => (
+                      <div class="stills__item">
+                        <img src={shot} alt="" loading="lazy" decoding="async" />
+                      </div>
                     )}
                   </For>
                 </div>
@@ -1344,8 +1480,7 @@ export function Title(props: {
                 </div>
               </section>
             </Show>
-          </>
-        )}
+        </>
       </Show>
     </div>
   );

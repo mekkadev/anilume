@@ -1025,6 +1025,100 @@
   line-height: 1.3;
 }
 
+.season-card[data-current="true"] .season-card__art {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-card);
+}
+
+.season-card[data-current="true"]:hover .season-card__art {
+  transform: none;
+}
+
+.season-card[data-current="true"] .season-card__relation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent);
+}
+
+.cast {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 108px;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+
+.cast__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  scroll-snap-align: start;
+}
+
+.cast__portrait {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--fill);
+  box-shadow: var(--shadow-card);
+}
+
+.cast__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cast__portrait .art-blank {
+  position: static;
+  width: 100%;
+  height: 100%;
+}
+
+.cast__name {
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.cast__role {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.stills {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(236px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+
+.stills__item {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--fill);
+  box-shadow: var(--shadow-card);
+  scroll-snap-align: start;
+}
+
+.stills__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .comments {
   display: flex;
   flex-direction: column;
@@ -1117,4 +1211,8 @@
   font-size: 19px;
   font-weight: 650;
   letter-spacing: 0.02em;
+}
+
+.stage__back--forward {
+  left: 42px;
 }

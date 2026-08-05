@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
+use anilume_core::discover::{Character, Comment, RelatedTitle, TitleDetail, Upcoming};
 use anilume_core::error::CoreErrorWire;
-use anilume_core::discover::{Comment, RelatedTitle, TitleDetail, Upcoming};
-use anilume_core::{
-    Artwork, CacheStats,
-    ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
-    LibraryEntry, WatchProgress,
-};
 use anilume_core::shikimori::{Account, ShikimoriConfig, UserRate};
+use anilume_core::{
+    Artwork, CacheStats, ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem,
+    DownloadRequest, LibraryEntry, WatchProgress,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::State;
@@ -51,7 +50,10 @@ pub async fn catalog_search(
 ) -> Answer<Value> {
     Ok(state
         .sidecar
-        .call("catalog.search", json!({ "source": source, "query": query }))
+        .call(
+            "catalog.search",
+            json!({ "source": source, "query": query }),
+        )
         .await?)
 }
 
@@ -86,7 +88,10 @@ pub async fn source_config_set(
 ) -> Answer<Value> {
     Ok(state
         .sidecar
-        .call("config.set", json!({ "section": section, "values": values }))
+        .call(
+            "config.set",
+            json!({ "section": section, "values": values }),
+        )
         .await?)
 }
 
@@ -141,10 +146,7 @@ pub async fn discover_search(
 }
 
 #[tauri::command]
-pub async fn artwork_lookup(
-    state: State<'_, AppState>,
-    ids: Vec<i64>,
-) -> Answer<Vec<Artwork>> {
+pub async fn artwork_lookup(state: State<'_, AppState>, ids: Vec<i64>) -> Answer<Vec<Artwork>> {
     Ok(state.artworks.lookup(&ids).await?)
 }
 
@@ -163,11 +165,17 @@ pub async fn discover_similar(
 }
 
 #[tauri::command]
-pub async fn discover_related(
+pub async fn discover_related(state: State<'_, AppState>, id: i64) -> Answer<Vec<RelatedTitle>> {
+    Ok(state.discover.related(id).await?)
+}
+
+#[tauri::command]
+pub async fn discover_characters(
     state: State<'_, AppState>,
     id: i64,
-) -> Answer<Vec<RelatedTitle>> {
-    Ok(state.discover.related(id).await?)
+    limit: Option<usize>,
+) -> Answer<Vec<Character>> {
+    Ok(state.discover.characters(id, limit.unwrap_or(12)).await?)
 }
 
 #[tauri::command]
@@ -176,7 +184,10 @@ pub async fn discover_comments(
     topic_id: i64,
     limit: Option<i64>,
 ) -> Answer<Vec<Comment>> {
-    Ok(state.discover.comments(topic_id, limit.unwrap_or(20)).await?)
+    Ok(state
+        .discover
+        .comments(topic_id, limit.unwrap_or(20))
+        .await?)
 }
 
 #[tauri::command]
@@ -202,11 +213,7 @@ pub struct SkipInterval {
 }
 
 #[tauri::command]
-pub async fn skip_times(
-    mal_id: i64,
-    episode: i64,
-    length: f64,
-) -> Answer<Vec<SkipInterval>> {
+pub async fn skip_times(mal_id: i64, episode: i64, length: f64) -> Answer<Vec<SkipInterval>> {
     let url = format!(
         "https://api.aniskip.com/v2/skip-times/{mal_id}/{episode}\
          ?types%5B%5D=op&types%5B%5D=ed&episodeLength={length:.0}"
@@ -230,7 +237,11 @@ pub async fn skip_times(
         .map_err(|e| anilume_core::CoreError::Network(e.to_string()))?;
 
     let mut found = Vec::new();
-    for entry in body.get("results").and_then(Value::as_array).unwrap_or(&vec![]) {
+    for entry in body
+        .get("results")
+        .and_then(Value::as_array)
+        .unwrap_or(&vec![])
+    {
         let interval = match entry.get("interval") {
             Some(value) => value,
             None => continue,

@@ -78,7 +78,11 @@ impl AppState {
 
     pub fn notifications_on(&self) -> bool {
         !matches!(
-            self.db.setting_get(NOTIFY_SETTING).ok().flatten().as_deref(),
+            self.db
+                .setting_get(NOTIFY_SETTING)
+                .ok()
+                .flatten()
+                .as_deref(),
             Some("off")
         )
     }

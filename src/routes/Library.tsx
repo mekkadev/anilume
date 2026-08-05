@@ -1,9 +1,10 @@
 import { For, Show, createResource, createSignal } from "solid-js";
 
 import { Art } from "../components/Art";
+import { RowsSkeleton } from "../components/PosterCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
-import { settled } from "../lib/resource";
+import { pending, settled } from "../lib/resource";
 import { relativeTime } from "../lib/format";
 import { navigate, openPalette, reportError } from "../lib/store";
 import type { LibraryEntry, LibraryStatus } from "../lib/types";
@@ -70,6 +71,7 @@ export function Library() {
         </For>
       </div>
 
+      <Show when={!pending(entriesRes)} fallback={<RowsSkeleton />}>
       <Show
         when={(entries() ?? []).length > 0}
         fallback={
@@ -120,6 +122,7 @@ export function Library() {
             )}
           </For>
         </div>
+      </Show>
       </Show>
     </div>
   );

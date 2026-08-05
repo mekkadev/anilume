@@ -28,7 +28,9 @@ import { api, checkForUpdate } from "./lib/api";
 import {
   ambient,
   canGoBack,
+  canGoForward,
   goBack,
+  goForward,
   loadSources,
   closePalette,
   matchRoute,
@@ -105,6 +107,18 @@ export function App() {
 
       if (event.key === "Escape" && canGoBack()) {
         goBack();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "[") {
+        event.preventDefault();
+        goBack();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "]") {
+        event.preventDefault();
+        goForward();
       }
     };
 
@@ -155,8 +169,17 @@ export function App() {
 
           <div class="stage__scroll" ref={scroller}>
             <Show when={canGoBack()}>
-              <button class="stage__back" onClick={goBack} title="Назад">
+              <button class="stage__back" onClick={goBack} title="Назад (⌘[)">
                 <Icon name="back" size={17} />
+              </button>
+            </Show>
+            <Show when={canGoForward()}>
+              <button
+                class="stage__back stage__back--forward"
+                onClick={goForward}
+                title="Вперёд (⌘])"
+              >
+                <Icon name="next" size={17} />
               </button>
             </Show>
 

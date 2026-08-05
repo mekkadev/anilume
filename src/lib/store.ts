@@ -25,19 +25,35 @@ export type Route =
 
 const [route, setRoute] = createSignal<Route>({ name: "home" });
 const [stack, setStack] = createSignal<Route[]>([]);
+const [ahead, setAhead] = createSignal<Route[]>([]);
 
 export { route };
 
 export function navigate(next: Route) {
   setStack([...stack(), route()].slice(-50));
+  setAhead([]);
   setRoute(next);
 }
 
 export function goBack() {
   const current = stack();
   const previous = current[current.length - 1];
+  if (!previous) return;
   setStack(current.slice(0, -1));
-  setRoute(previous ?? { name: "home" });
+  setAhead([route(), ...ahead()].slice(0, 50));
+  setRoute(previous);
+}
+
+export function goForward() {
+  const [next, ...rest] = ahead();
+  if (!next) return;
+  setStack([...stack(), route()].slice(-50));
+  setAhead(rest);
+  setRoute(next);
+}
+
+export function canGoForward() {
+  return ahead().length > 0;
 }
 
 export function canGoBack() {

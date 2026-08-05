@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AnimeCard,
   Artwork,
+  Character,
   AnimeDetail,
   AppError,
   ContinueItem,
@@ -58,9 +59,6 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 export const api = {
   sources: () =>
     call<{ sources: SourceInfo[]; default: string }>("sources_list"),
-
-  ongoing: (source: string) =>
-    call<{ items: AnimeCard[] }>("catalog_ongoing", { source }),
 
   search: (source: string, query: string) =>
     call<{ items: AnimeCard[]; query: string }>("catalog_search", {
@@ -118,6 +116,9 @@ export const api = {
     call<DiscoverCard[]>("discover_similar", { id, limit }),
 
   discoverRelated: (id: number) => call<RelatedTitle[]>("discover_related", { id }),
+
+  discoverCharacters: (id: number, limit = 12) =>
+    call<Character[]>("discover_characters", { id, limit }),
 
   discoverComments: (topicId: number, limit = 20) =>
     call<ShikiComment[]>("discover_comments", { topicId, limit }),

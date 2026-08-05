@@ -71,3 +71,22 @@ export function PosterSkeleton() {
     </div>
   );
 }
+
+export function RowsSkeleton(props: { count?: number }) {
+  return (
+    <div class="library-list">
+      {Array.from({ length: props.count ?? 5 }, () => (
+        <div class="library-row">
+          <div
+            class="skeleton"
+            style={{ width: "42px", height: "58px", "border-radius": "8px", flex: "none" }}
+          />
+          <div style={{ flex: "1", display: "flex", "flex-direction": "column", gap: "7px" }}>
+            <div class="skeleton" style={{ height: "13px", width: "42%", "border-radius": "5px" }} />
+            <div class="skeleton" style={{ height: "11px", width: "24%", "border-radius": "5px" }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

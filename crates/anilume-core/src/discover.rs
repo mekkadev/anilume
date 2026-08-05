@@ -250,9 +250,18 @@ pub struct Comment {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Character {
+    pub id: i64,
+    pub name: String,
+    pub role: String,
+    pub portrait: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawImage {
-    #[serde(default)]
+  #[serde(default)]
     preview: Option<String>,
     #[serde(default)]
     original: Option<String>,
@@ -311,6 +320,27 @@ struct RawDetail {
     next_episode_at: Option<String>,
     #[serde(default)]
     topic_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawCharacter {
+    id: i64,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    russian: Option<String>,
+    #[serde(default)]
+    image: Option<RawImage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawRole {
+    #[serde(default)]
+    roles_russian: Vec<String>,
+    #[serde(default)]
+    roles: Vec<String>,
+    #[serde(default)]
+    character: Option<RawCharacter>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -732,6 +762,58 @@ impl Discover {
                 })
             })
             .collect())
+    }
+
+    pub async fn characters(&self, id: i64, limit: usize) -> Result<Vec<Character>> {
+        let raw: Vec<RawRole> = self
+            .fetch(&format!("/api/animes/{id}/roles"), &[], TTL_LINKS)
+            .await?;
+
+        let mut leads: Vec<Character> = Vec::new();
+        let mut rest: Vec<Character> = Vec::new();
+
+        for entry in raw {
+            let Some(person) = entry.character else {
+                continue;
+            };
+            let lead = entry.roles.iter().any(|role| role == "Main");
+            let role = entry
+                .roles_russian
+                .first()
+                .cloned()
+                .or_else(|| entry.roles.first().cloned())
+                .unwrap_or_default();
+            let portrait = person.image.and_then(|image| {
+                image
+                    .preview
+                    .or(image.original)
+                    .filter(|path| !path.is_empty())
+                    .map(|path| absolute(&path))
+            });
+            let name = person
+                .russian
+                .filter(|value| !value.is_empty())
+                .unwrap_or(person.name);
+            if name.is_empty() {
+                continue;
+            }
+
+            let item = Character {
+                id: person.id,
+                name,
+                role,
+                portrait,
+            };
+            if lead {
+                leads.push(item);
+            } else {
+                rest.push(item);
+            }
+        }
+
+        leads.extend(rest);
+        leads.truncate(limit);
+        Ok(leads)
     }
 
     pub async fn calendar(&self) -> Result<Vec<Upcoming>> {

@@ -1,9 +1,10 @@
 import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 
 import { Art } from "../components/Art";
+import { RowsSkeleton } from "../components/PosterCard";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
-import { settled } from "../lib/resource";
+import { pending, settled } from "../lib/resource";
 import { formatTime, plural, relativeTime } from "../lib/format";
 import { navigate, openPalette, pushToast, reportError } from "../lib/store";
 import type { WatchProgress } from "../lib/types";
@@ -98,6 +99,7 @@ export function History() {
         </Show>
       </div>
 
+      <Show when={!pending(historyRes)} fallback={<RowsSkeleton />}>
       <Show
         when={total() > 0}
         fallback={
@@ -187,6 +189,7 @@ export function History() {
             </section>
           )}
         </For>
+      </Show>
       </Show>
     </div>
   );

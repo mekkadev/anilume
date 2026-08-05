@@ -12,9 +12,14 @@ export function Art(props: ArtProps) {
   const [loaded, setLoaded] = createSignal(false);
   const [broken, setBroken] = createSignal(false);
 
+  let last: string | null = null;
+  let virgin = true;
+
   createEffect(() => {
-    props.src;
-    setLoaded(false);
+    const value = props.src ?? null;
+    if (!virgin && value === last) return;
+    virgin = false;
+    last = value;
     setBroken(false);
   });
 
@@ -30,6 +35,11 @@ export function Art(props: ArtProps) {
   return (
     <Show when={props.src && !broken()} fallback={<Blank label={initials()} />}>
       <img
+        ref={(node) =>
+          queueMicrotask(() => {
+            if (node.complete && node.naturalWidth > 0) setLoaded(true);
+          })
+        }
         src={props.src!}
         alt=""
         loading={props.eager ? "eager" : "lazy"}

@@ -78,6 +78,13 @@ export interface DiscoverCard {
   episodes: number | null;
 }
 
+export interface Character {
+  id: number;
+  name: string;
+  role: string;
+  portrait: string | null;
+}
+
 export interface DiscoverNamed {
   id: number;
   name: string;

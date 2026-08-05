@@ -418,8 +418,13 @@ export function Player(props: { request: PlaybackRequest }) {
   }
 
   function togglePlay() {
-    if (video.paused) void video.play();
-    else video.pause();
+    if (video.paused) {
+      setPlaying(true);
+      void video.play().catch(() => setPlaying(false));
+    } else {
+      setPlaying(false);
+      video.pause();
+    }
   }
 
   function seekBy(delta: number) {
@@ -523,6 +528,34 @@ export function Player(props: { request: PlaybackRequest }) {
     window.addEventListener("keydown", onKey);
     document.addEventListener("fullscreenchange", onFullscreenChange);
 
+    if ("mediaSession" in navigator) {
+      const session = navigator.mediaSession;
+      session.setActionHandler("play", () => togglePlay());
+      session.setActionHandler("pause", () => togglePlay());
+      session.setActionHandler("seekbackward", () => seekBy(-5));
+      session.setActionHandler("seekforward", () => seekBy(5));
+      session.setActionHandler("previoustrack", () => {
+        if (hasPrevious()) void switchEpisode(episodeIndex() - 1);
+      });
+      session.setActionHandler("nexttrack", () => {
+        if (hasNext()) void switchEpisode(episodeIndex() + 1);
+      });
+
+      onCleanup(() => {
+        session.metadata = null;
+        for (const action of [
+          "play",
+          "pause",
+          "seekbackward",
+          "seekforward",
+          "previoustrack",
+          "nexttrack",
+        ] as MediaSessionAction[]) {
+          session.setActionHandler(action, null);
+        }
+      });
+    }
+
     onCleanup(() => {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
@@ -551,6 +584,22 @@ export function Player(props: { request: PlaybackRequest }) {
       else revealControls();
     }, { defer: true }),
   );
+
+  createEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: episode()?.title ?? props.request.animeTitle,
+      artist: props.request.animeTitle,
+      artwork: props.request.poster
+        ? [{ src: props.request.poster, sizes: "512x512" }]
+        : [],
+    });
+  });
+
+  createEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = playing() ? "playing" : "paused";
+  });
 
   return (
     <div

@@ -85,10 +85,8 @@ pub fn run() {
                     .unwrap_or_else(|_| data_dir.join("downloads"))
             });
 
-            let state = tauri::async_runtime::block_on(AppState::initialize(
-                data_dir,
-                downloads_dir,
-            ))?;
+            let state =
+                tauri::async_runtime::block_on(AppState::initialize(data_dir, downloads_dir))?;
 
             let mut events = state.downloads.subscribe();
             let emitter = handle.clone();
@@ -120,6 +118,7 @@ pub fn run() {
             commands::artwork_lookup,
             commands::discover_similar,
             commands::discover_related,
+            commands::discover_characters,
             commands::discover_comments,
             commands::discover_calendar,
             commands::discover_match,
