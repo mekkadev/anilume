@@ -16,8 +16,8 @@ SIZE = 1024
 SUPERSAMPLE = 2
 OUTPUT = Path(__file__).resolve().parents[1] / "src-tauri" / "icons" / "source.png"
 
-VERMILION = (0xB8, 0x32, 0x1C)
-PAPER = (0xF6, 0xF4, 0xEF)
+ACCENT = (0x00, 0x7A, 0xFF)
+PAPER = (0xFF, 0xFF, 0xFF)
 INK = (0x17, 0x16, 0x0F)
 
 
@@ -75,7 +75,7 @@ def render() -> bytes:
             if rounded_rect_alpha(bx, by, big, radius) == 0.0:
                 continue
 
-            colour = VERMILION
+            colour = ACCENT
 
             on_rule = (
                 rounded_rect_alpha(bx, by, big, radius, inset=rule_outer) > 0

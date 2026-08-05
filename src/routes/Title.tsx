@@ -390,13 +390,13 @@ export function Title(props: { card: AnimeCard }) {
                     <span class="chip">{sourceName(props.card.source)}</span>
                   </div>
 
-                  <Show when={info().meta.genres.length > 0}>
-                    <div class="hero__genres">{info().meta.genres.join(" · ")}</div>
+                  <Show when={(info().meta.genres ?? []).length > 0}>
+                    <div class="hero__genres">{(info().meta.genres ?? []).join(" · ")}</div>
                   </Show>
 
-                  <Show when={info().meta.tags.length > 0}>
+                  <Show when={(info().meta.tags ?? []).length > 0}>
                     <div class="hero__tags">
-                      <For each={info().meta.tags.slice(0, 8)}>
+                      <For each={(info().meta.tags ?? []).slice(0, 8)}>
                         {(tag) => <span class="tag">{tag}</span>}
                       </For>
                     </div>
