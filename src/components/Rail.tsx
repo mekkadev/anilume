@@ -15,6 +15,7 @@ import { Icon, type IconName } from "./Icon";
 type SimpleRoute =
   | "home"
   | "discover"
+  | "schedule"
   | "library"
   | "history"
   | "downloads"
@@ -23,6 +24,7 @@ type SimpleRoute =
 const NAV: { name: SimpleRoute; label: string; icon: IconName }[] = [
   { name: "home", label: "Главная", icon: "home" },
   { name: "discover", label: "Каталог", icon: "sliders" },
+  { name: "schedule", label: "Расписание", icon: "calendar" },
   { name: "library", label: "Библиотека", icon: "library" },
   { name: "history", label: "История", icon: "clock" },
   { name: "downloads", label: "Загрузки", icon: "download" },

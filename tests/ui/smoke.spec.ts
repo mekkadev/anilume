@@ -214,12 +214,30 @@ test("страница поиска ищет без нажатия Enter", async
   await expect(page.locator(".card").first()).toBeVisible();
 });
 
+test("расписание группирует серии по дням", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Расписание" }).click();
+  await expect(page.getByRole("heading", { name: "Расписание" })).toBeVisible();
+
+  await expect(page.locator(".airing")).toHaveCount(3, { timeout: 8000 });
+  await expect(page.getByRole("heading", { name: "Из вашей библиотеки" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Сегодня" })).toBeVisible();
+  await expect(page.locator('.airing[data-mine="true"]')).toHaveCount(2);
+  await expect(page.locator(".airing__meta").first()).toContainText("8 серия");
+
+  await page.locator(".airing").first().click();
+  await expect(page.locator(".title-info__name")).toBeVisible({ timeout: 8000 });
+});
+
 test("все разделы рельса открываются", async ({ page }) => {
   await installTauri(page);
   await page.goto("/");
 
   for (const [button, heading] of [
     ["Каталог", "Каталог"],
+    ["Расписание", "Расписание"],
     ["Библиотека", "Библиотека"],
     ["История", "История"],
     ["Настройки", "Настройки"],

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anilume_core::error::CoreErrorWire;
-use anilume_core::discover::{Comment, RelatedTitle, TitleDetail};
+use anilume_core::discover::{Comment, RelatedTitle, TitleDetail, Upcoming};
 use anilume_core::{
     Artwork, CacheStats,
     ContinueItem, DiscoverCard, DiscoverOptions, DiscoverQuery, DownloadItem, DownloadRequest,
@@ -169,6 +169,11 @@ pub async fn discover_comments(
     limit: Option<i64>,
 ) -> Answer<Vec<Comment>> {
     Ok(state.discover.comments(topic_id, limit.unwrap_or(20)).await?)
+}
+
+#[tauri::command]
+pub async fn discover_calendar(state: State<'_, AppState>) -> Answer<Vec<Upcoming>> {
+    Ok(state.discover.calendar().await?)
 }
 
 #[tauri::command]

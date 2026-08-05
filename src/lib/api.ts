@@ -22,6 +22,7 @@ import type {
   SourceInfo,
   CacheStats,
   SourceProbe,
+  Upcoming,
   StudioInfo,
   TitleDetail,
   RelatedTitle,
@@ -75,6 +76,8 @@ export const api = {
     call<{ probes: SourceProbe[] }>("catalog_probe", { items }),
 
   anime: (handle: string) => call<AnimeDetail>("anime_get", { handle }),
+
+  discoverCalendar: () => call<Upcoming[]>("discover_calendar"),
 
   cacheStats: () => call<CacheStats>("cache_stats"),
 

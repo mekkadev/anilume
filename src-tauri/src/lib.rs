@@ -82,6 +82,7 @@ pub fn run() {
             commands::discover_similar,
             commands::discover_related,
             commands::discover_comments,
+            commands::discover_calendar,
             commands::discover_match,
             commands::skip_times,
             commands::playback_open,

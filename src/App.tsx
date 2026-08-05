@@ -19,6 +19,7 @@ import { Downloads } from "./routes/Downloads";
 import { Home } from "./routes/Home";
 import { History } from "./routes/History";
 import { Library } from "./routes/Library";
+import { Schedule } from "./routes/Schedule";
 import { Search } from "./routes/Search";
 import { Settings } from "./routes/Settings";
 import { Title } from "./routes/Title";
@@ -160,6 +161,9 @@ export function App() {
                 </Match>
                 <Match when={matchRoute(route(), "discover")}>
                   <Discover />
+                </Match>
+                <Match when={matchRoute(route(), "schedule")}>
+                  <Schedule />
                 </Match>
                 <Match when={matchRoute(route(), "title")}>
                   {(current) => (

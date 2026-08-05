@@ -37,6 +37,7 @@ const TTL_CATALOG: i64 = 60 * 60;
 const TTL_TITLE: i64 = 24 * 60 * 60;
 const TTL_LINKS: i64 = 7 * 24 * 60 * 60;
 const TTL_COMMENTS: i64 = 10 * 60;
+const TTL_CALENDAR: i64 = 30 * 60;
 const TTL_OPTIONS: i64 = 30 * 24 * 60 * 60;
 const TTL_MATCH: i64 = 30 * 24 * 60 * 60;
 const PAGE_SIZE: i64 = 40;
@@ -232,6 +233,15 @@ pub struct RelatedTitle {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct Upcoming {
+    pub card: DiscoverCard,
+    pub episode: i64,
+    pub airs_at: String,
+    pub duration: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Comment {
     pub id: i64,
     pub author: String,
@@ -314,6 +324,18 @@ struct RawRelated {
 }
 
 #[derive(Debug, Deserialize)]
+struct RawCalendar {
+    #[serde(default)]
+    next_episode: Option<i64>,
+    #[serde(default)]
+    next_episode_at: Option<String>,
+    #[serde(default)]
+    duration: Option<i64>,
+    #[serde(default)]
+    anime: Option<RawAnime>,
+}
+
+#[derive(Debug, Deserialize)]
 struct RawUser {
     #[serde(default)]
     nickname: String,
@@ -363,6 +385,19 @@ fn join_ids(ids: &[i64]) -> Option<String> {
     } else {
         Some(cleaned.join(","))
     }
+}
+
+fn upcoming_from_raw(raw: RawCalendar) -> Option<Upcoming> {
+    let anime = raw.anime?;
+    let airs_at = raw
+        .next_episode_at
+        .filter(|value| !value.trim().is_empty())?;
+    Some(Upcoming {
+        card: card_from_raw(anime),
+        episode: raw.next_episode.unwrap_or(0).max(0),
+        airs_at,
+        duration: raw.duration.filter(|value| *value > 0),
+    })
 }
 
 fn cache_key(path: &str, params: &[(String, String)]) -> String {
@@ -697,6 +732,11 @@ impl Discover {
                 })
             })
             .collect())
+    }
+
+    pub async fn calendar(&self) -> Result<Vec<Upcoming>> {
+        let raw: Vec<RawCalendar> = self.fetch("/api/calendar", &[], TTL_CALENDAR).await?;
+        Ok(raw.into_iter().filter_map(upcoming_from_raw).collect())
     }
 
     pub async fn comments(&self, topic_id: i64, limit: i64) -> Result<Vec<Comment>> {
@@ -1180,6 +1220,26 @@ mod tests {
             "https://cdn.example/a.jpg"
         );
         assert_eq!(absolute("/a.jpg"), format!("{CATALOG_BASE}/a.jpg"));
+    }
+
+    #[test]
+    fn calendar_entries_without_a_date_are_dropped() {
+        let raw: Vec<RawCalendar> = serde_json::from_str(
+            r#"[
+              {"next_episode":10,"next_episode_at":"2026-08-09T17:00:00+03:00","duration":24,
+               "anime":{"id":1,"name":"One Piece","russian":"Ван-Пис","episodes_aired":9}},
+              {"next_episode":3,"next_episode_at":null,"anime":{"id":2,"name":"Без даты"}},
+              {"next_episode":1,"next_episode_at":"2026-08-10T00:00:00+03:00"}
+            ]"#,
+        )
+        .unwrap();
+
+        let found: Vec<Upcoming> = raw.into_iter().filter_map(upcoming_from_raw).collect();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].card.title, "Ван-Пис");
+        assert_eq!(found[0].episode, 10);
+        assert_eq!(found[0].duration, Some(24));
+        assert_eq!(found[0].airs_at, "2026-08-09T17:00:00+03:00");
     }
 
     #[test]

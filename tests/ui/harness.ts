@@ -139,13 +139,38 @@ export const FIXTURES: Record<string, unknown> = {
     },
   ],
   discover_options: { genres: [], studios: [] },
+  discover_calendar: [
+    {
+      card: shiki[0],
+      episode: 8,
+      airsAt: new Date(Date.now() + 3 * 3600_000).toISOString(),
+      duration: 24,
+    },
+    {
+      card: shiki[1],
+      episode: 3,
+      airsAt: new Date(Date.now() + 30 * 3600_000).toISOString(),
+      duration: null,
+    },
+  ],
   artwork_lookup: [],
 
   continue_watching: [],
   progress_for_anime: [],
   watch_history: [],
   library_get: null,
-  library_list: [],
+  library_list: [
+    {
+      source: "anilibria",
+      animeKey: "https://site/a/0",
+      title: TITLES[0],
+      poster: poster("card-0"),
+      status: "watching",
+      score: 9,
+      shikimoriId: 100,
+      updatedAt: 1,
+    },
+  ],
   library_upsert: null,
   library_remove: null,
 

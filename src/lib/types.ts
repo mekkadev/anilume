@@ -7,6 +7,13 @@ export interface SourceInfo {
   notes: string[];
 }
 
+export interface Upcoming {
+  card: DiscoverCard;
+  episode: number;
+  airsAt: string;
+  duration: number | null;
+}
+
 export interface CacheStats {
   entries: number;
   bytes: number;
