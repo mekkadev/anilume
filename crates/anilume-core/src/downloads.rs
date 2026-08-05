@@ -15,6 +15,9 @@ use crate::error::{CoreError, Result};
 
 const MAX_PARALLEL_DOWNLOADS: usize = 2;
 const EVENT_CHANNEL_CAPACITY: usize = 256;
+const ATTEMPTS: usize = 3;
+const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_secs(4);
+const INTERRUPTED: &str = "Загрузка прервана при выходе из приложения";
 
 pub const STATUS_QUEUED: &str = "queued";
 pub const STATUS_RUNNING: &str = "running";
@@ -121,6 +124,52 @@ impl DownloadManager {
         Ok(item)
     }
 
+    pub fn recover_interrupted(&self) -> Result<usize> {
+        let conn = self.db_conn();
+        let changed = conn.execute(
+            "UPDATE downloads SET status = ?1, progress = 0, error = ?2
+             WHERE status IN (?3, ?4)",
+            params![STATUS_ERROR, INTERRUPTED, STATUS_RUNNING, STATUS_QUEUED],
+        )?;
+        Ok(changed)
+    }
+
+    pub fn retry(self: &Arc<Self>, id: i64) -> Result<DownloadItem> {
+        let request = self.stored_request(id)?;
+        if request.url.trim().is_empty() {
+            return Err(CoreError::Other(
+                "Ссылка на видео не сохранена — поставьте серию в очередь заново".into(),
+            ));
+        }
+        self.enqueue(request)
+    }
+
+    fn stored_request(&self, id: i64) -> Result<DownloadRequest> {
+        let conn = self.db_conn();
+        conn.query_row(
+            "SELECT source, anime_key, anime_title, poster, episode_ordinal, episode_title,
+                    studio, quality, url, headers
+             FROM downloads WHERE id = ?1",
+            params![id],
+            |row| {
+                let raw: String = row.get(9)?;
+                Ok(DownloadRequest {
+                    source: row.get(0)?,
+                    anime_key: row.get(1)?,
+                    anime_title: row.get(2)?,
+                    poster: row.get(3)?,
+                    episode_ordinal: row.get(4)?,
+                    episode_title: row.get(5)?,
+                    studio: row.get(6)?,
+                    quality: row.get(7)?,
+                    url: row.get(8)?,
+                    headers: serde_json::from_str(&raw).unwrap_or_default(),
+                })
+            },
+        )
+        .map_err(Into::into)
+    }
+
     pub fn cancel(&self, id: i64) -> Result<()> {
         if let Some(entry) = self.running.get(&id) {
             entry.notify_waiters();
@@ -188,24 +237,46 @@ impl DownloadManager {
             return;
         }
 
-        let cancel = Arc::new(tokio::sync::Notify::new());
-        self.running.insert(id, cancel.clone());
-        let _ = self.update_status(id, STATUS_RUNNING, 0.0, None);
+        let mut attempt = 1;
+        loop {
+            let cancel = Arc::new(tokio::sync::Notify::new());
+            self.running.insert(id, cancel.clone());
+            let _ = self.update_status(id, STATUS_RUNNING, 0.0, None);
 
-        let outcome = self.spawn_ffmpeg(id, &request, &file_path, cancel).await;
-        self.running.remove(&id);
+            let outcome = self.spawn_ffmpeg(id, &request, &file_path, cancel).await;
+            self.running.remove(&id);
 
-        match outcome {
-            Ok(true) => {
-                let _ = self.update_status(id, STATUS_DONE, 1.0, None);
-            }
-            Ok(false) => {
-                let _ = std::fs::remove_file(&file_path);
-                let _ = self.update_status(id, STATUS_CANCELED, 0.0, None);
-            }
-            Err(error) => {
-                let _ = std::fs::remove_file(&file_path);
-                let _ = self.update_status(id, STATUS_ERROR, 0.0, Some(error.to_string()));
+            match outcome {
+                Ok(true) => {
+                    let _ = self.update_status(id, STATUS_DONE, 1.0, None);
+                    return;
+                }
+                Ok(false) => {
+                    let _ = std::fs::remove_file(&file_path);
+                    let _ = self.update_status(id, STATUS_CANCELED, 0.0, None);
+                    return;
+                }
+                Err(error) => {
+                    let _ = std::fs::remove_file(&file_path);
+                    if attempt >= ATTEMPTS {
+                        let _ = self.update_status(id, STATUS_ERROR, 0.0, Some(error.to_string()));
+                        return;
+                    }
+
+                    tracing::warn!("загрузка {id}: попытка {attempt} не удалась: {error}");
+                    let _ = self.update_status(
+                        id,
+                        STATUS_QUEUED,
+                        0.0,
+                        Some(format!("Обрыв, повтор {}/{ATTEMPTS}", attempt + 1)),
+                    );
+                    tokio::time::sleep(RETRY_BACKOFF * attempt as u32).await;
+
+                    if matches!(self.get(id), Ok(Some(item)) if item.status == STATUS_CANCELED) {
+                        return;
+                    }
+                    attempt += 1;
+                }
             }
         }
     }
@@ -293,14 +364,17 @@ impl DownloadManager {
             r#"
             INSERT INTO downloads
                 (source, anime_key, anime_title, poster, episode_ordinal, episode_title,
-                 studio, quality, file_path, status, progress, error, created_at)
+                 studio, quality, file_path, status, progress, error, created_at,
+                 url, headers)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0, NULL,
-                    CAST(strftime('%s','now') AS INTEGER))
+                    CAST(strftime('%s','now') AS INTEGER), ?11, ?12)
             ON CONFLICT (source, anime_key, episode_ordinal, quality) DO UPDATE SET
                 status    = excluded.status,
                 progress  = 0,
                 error     = NULL,
-                file_path = excluded.file_path
+                file_path = excluded.file_path,
+                url       = excluded.url,
+                headers   = excluded.headers
             "#,
             params![
                 request.source,
@@ -313,6 +387,8 @@ impl DownloadManager {
                 request.quality,
                 file_path.to_string_lossy(),
                 STATUS_QUEUED,
+                request.url,
+                serde_json::to_string(&request.headers).unwrap_or_else(|_| "{}".into()),
             ],
         )?;
 
@@ -622,5 +698,70 @@ mod tests {
         );
         assert_eq!(parse_labeled_time("Duration: N/A", "Duration:"), None);
         assert_eq!(parse_labeled_time("no marker here", "time="), None);
+    }
+
+    #[test]
+    fn interrupted_downloads_come_back_as_retryable_errors() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let manager = Arc::new(DownloadManager::new(
+            db.clone(),
+            PathBuf::from("ffmpeg"),
+            std::env::temp_dir(),
+        ));
+
+        let item = manager
+            .insert(&request(), &std::env::temp_dir().join("a.mp4"))
+            .unwrap();
+        manager
+            .update_status(item.id, STATUS_RUNNING, 0.4, None)
+            .unwrap();
+
+        assert_eq!(manager.recover_interrupted().unwrap(), 1);
+
+        let found = manager.get(item.id).unwrap().unwrap();
+        assert_eq!(found.status, STATUS_ERROR);
+        assert_eq!(found.error.as_deref(), Some(INTERRUPTED));
+        assert_eq!(found.progress, 0.0);
+    }
+
+    #[test]
+    fn a_stored_request_keeps_the_url_and_headers_for_a_retry() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let manager = Arc::new(DownloadManager::new(
+            db.clone(),
+            PathBuf::from("ffmpeg"),
+            std::env::temp_dir(),
+        ));
+
+        let item = manager
+            .insert(&request(), &std::env::temp_dir().join("a.mp4"))
+            .unwrap();
+        let restored = manager.stored_request(item.id).unwrap();
+
+        assert_eq!(restored.url, request().url);
+        assert_eq!(restored.headers, request().headers);
+        assert_eq!(restored.episode_ordinal, 3);
+    }
+
+    #[test]
+    fn a_row_without_a_saved_url_refuses_to_retry() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let manager = Arc::new(DownloadManager::new(
+            db.clone(),
+            PathBuf::from("ffmpeg"),
+            std::env::temp_dir(),
+        ));
+
+        let mut without = request();
+        without.url = String::new();
+        let item = manager
+            .insert(&without, &std::env::temp_dir().join("a.mp4"))
+            .unwrap();
+
+        let error = manager.retry(item.id).unwrap_err().to_string();
+        assert!(
+            error.contains("поставьте серию в очередь заново"),
+            "{error}"
+        );
     }
 }

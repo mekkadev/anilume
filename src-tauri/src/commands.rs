@@ -353,6 +353,11 @@ pub async fn setting_set(state: State<'_, AppState>, key: String, value: String)
 }
 
 #[tauri::command]
+pub async fn downloads_retry(state: State<'_, AppState>, id: i64) -> Answer<DownloadItem> {
+    Ok(state.downloads.retry(id)?)
+}
+
+#[tauri::command]
 pub async fn notify_status(state: State<'_, AppState>) -> Answer<bool> {
     Ok(state.notifications_on())
 }

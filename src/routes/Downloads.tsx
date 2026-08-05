@@ -51,6 +51,19 @@ export function Downloads() {
     }
   };
 
+  const retry = async (item: DownloadItem) => {
+    setBusy(item.id);
+    try {
+      await api.downloadsRetry(item.id);
+      await refetch();
+      pushToast(`Серия ${item.episodeOrdinal} снова в очереди`, "success");
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const remove = async (item: DownloadItem, deleteFile: boolean) => {
     setBusy(item.id);
     try {
@@ -138,6 +151,17 @@ export function Downloads() {
                       {Math.round(item.progress * 100)}%
                     </Show>
                   </span>
+
+                  <Show when={item.status === "error" || item.status === "canceled"}>
+                    <button
+                      class="tool-btn"
+                      title="Скачать заново"
+                      disabled={busy() === item.id}
+                      onClick={() => void retry(item)}
+                    >
+                      <Icon name="refresh" size={17} />
+                    </button>
+                  </Show>
 
                   <Show
                     when={item.status === "running" || item.status === "queued"}

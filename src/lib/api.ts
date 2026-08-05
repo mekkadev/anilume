@@ -81,6 +81,8 @@ export const api = {
 
   discoverCalendar: () => call<Upcoming[]>("discover_calendar"),
 
+  downloadsRetry: (id: number) => call<DownloadItem>("downloads_retry", { id }),
+
   notifyStatus: () => call<boolean>("notify_status"),
 
   notifySet: (on: boolean) => call<void>("notify_set", { on }),

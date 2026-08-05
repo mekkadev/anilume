@@ -214,6 +214,18 @@ test("страница поиска ищет без нажатия Enter", async
   await expect(page.locator(".card").first()).toBeVisible();
 });
 
+test("оборванная загрузка перезапускается кнопкой", async ({ page }) => {
+  await installTauri(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Загрузки/ }).click();
+  await expect(page.locator(".download-row")).toHaveCount(1, { timeout: 8000 });
+  await expect(page.locator(".download-row__error")).toContainText("прервана при выходе");
+
+  await page.locator('button[title="Скачать заново"]').click();
+  await expect(page.locator(".toast")).toContainText("снова в очереди", { timeout: 8000 });
+});
+
 test("расписание группирует серии по дням", async ({ page }) => {
   await installTauri(page);
   await page.goto("/");

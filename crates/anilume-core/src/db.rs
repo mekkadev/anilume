@@ -157,6 +157,9 @@ impl Db {
                 ON cache (fetched_at);
             "#,
         )?;
+
+        add_column(&conn, "downloads", "url", "TEXT NOT NULL DEFAULT ''")?;
+        add_column(&conn, "downloads", "headers", "TEXT NOT NULL DEFAULT '{}'")?;
         Ok(())
     }
 
@@ -432,6 +435,20 @@ pub struct Cached {
 pub struct CacheStats {
     pub entries: i64,
     pub bytes: i64,
+}
+
+fn add_column(conn: &Connection, table: &str, column: &str, spec: &str) -> Result<()> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let existing: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    if existing.iter().any(|name| name == column) {
+        return Ok(());
+    }
+
+    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {spec}"))?;
+    Ok(())
 }
 
 fn now() -> i64 {

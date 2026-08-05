@@ -175,7 +175,25 @@ export const FIXTURES: Record<string, unknown> = {
   library_remove: null,
 
   downloads_available: true,
-  downloads_list: [],
+  downloads_list: [
+    {
+      id: 1,
+      source: "anilibria",
+      animeKey: "https://site/a/0",
+      animeTitle: TITLES[0],
+      poster: poster("card-0"),
+      episodeOrdinal: 4,
+      episodeTitle: "Серия 4",
+      studio: "AniLibria",
+      quality: 1080,
+      filePath: "/x.mp4",
+      status: "error",
+      progress: 0,
+      error: "Загрузка прервана при выходе из приложения",
+      createdAt: 1,
+    },
+  ],
+  downloads_retry: { id: 1, status: "queued" },
   downloads_find_completed: null,
 
   shikimori_status: { configured: false, loggedIn: false, account: null },

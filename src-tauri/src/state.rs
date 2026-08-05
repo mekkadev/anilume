@@ -42,6 +42,12 @@ impl AppState {
             downloads_dir,
         ));
 
+        if let Ok(count) = downloads.recover_interrupted() {
+            if count > 0 {
+                tracing::info!("незавершённых загрузок восстановлено: {count}");
+            }
+        }
+
         Ok(Self {
             sidecar,
             proxy,

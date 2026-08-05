@@ -153,6 +153,7 @@ pub fn run() {
             commands::downloads_enqueue,
             commands::downloads_cancel,
             commands::downloads_remove,
+            commands::downloads_retry,
             commands::downloads_find_completed,
         ])
         .run(tauri::generate_context!())
